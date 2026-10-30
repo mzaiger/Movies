@@ -41,8 +41,11 @@
   .thumb-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
   .stream-pill { position:absolute; left:8px; bottom:8px; z-index:2; border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; background:#1E9E5A; color:#fff; }
   .stream-pill.rent { background:rgba(255,255,255,.93); color:var(--text-dim); border:1px solid var(--line); }
-  .streamline { font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#1E7A4D; margin:0 0 8px; overflow-wrap:anywhere; }
   .rank-pill { position:absolute; top:8px; right:8px; z-index:2; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; }
+  .dates { font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--text-dim); margin:8px 0 0; line-height:1.55; }
+  .dates b { font-weight:600; color:var(--text); }
+  .watch-label { font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; color:#1E7A4D; margin:10px 0 0; }
+  .links.watch { margin-top:6px; }
   .fav-toggle { position:absolute; top:8px; left:8px; z-index:3; width:38px; height:38px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; cursor:pointer; }
   .fav-toggle input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
   .fav-star { font-size:20px; line-height:1; color:var(--text-dim); pointer-events:none; transition:color .15s ease, transform .15s ease; }
@@ -154,6 +157,59 @@ async function loadData(force) {
   $('lastUpdated').textContent = index ? `Last updated: ${ago(index.updated)}` : 'Last updated: not yet';
 }
 
+// Streaming services: how to match TMDb/JustWatch provider names, the site's favicon domain, and its search URL.
+// Several provider names for one service (Netflix, Netflix Standard with Ads, Max Amazon Channel...) collapse into one link.
+const SERVICES = [
+  { k:'netflix',   re:/netflix/,                         name:'Netflix',        domain:'netflix.com',        url:q => `https://www.netflix.com/search?q=${q}` },
+  { k:'hulu',      re:/^hulu/,                           name:'Hulu',           domain:'hulu.com',           url:q => `https://www.hulu.com/search?q=${q}` },
+  { k:'disney',    re:/disney/,                          name:'Disney+',        domain:'disneyplus.com',     url:q => `https://www.disneyplus.com/search?q=${q}` },
+  { k:'max',       re:/^max$|hbo/,                       name:'HBO Max',        domain:'hbomax.com',         url:q => `https://play.hbomax.com/search?q=${q}` },
+  { k:'prime',     re:/prime video|^amazon video|^amazon prime/, name:'Prime Video', domain:'primevideo.com', url:q => `https://www.amazon.com/s?k=${q}&i=instant-video` },
+  { k:'apple',     re:/^apple tv/,                       name:'Apple TV',       domain:'tv.apple.com',       url:q => `https://tv.apple.com/search?term=${q}` },
+  { k:'paramount', re:/paramount|showtime/,              name:'Paramount+',     domain:'paramountplus.com',  url:q => `https://www.paramountplus.com/search/?q=${q}` },
+  { k:'peacock',   re:/peacock/,                         name:'Peacock',        domain:'peacocktv.com',      url:q => `https://www.peacocktv.com/search?q=${q}` },
+  { k:'tubi',      re:/tubi/,                            name:'Tubi',           domain:'tubitv.com',         url:q => `https://tubitv.com/search/${q}` },
+  { k:'pluto',     re:/pluto/,                           name:'Pluto TV',       domain:'pluto.tv',           url:q => `https://pluto.tv/us/search/details?query=${q}` },
+  { k:'roku',      re:/roku/,                            name:'The Roku Channel', domain:'therokuchannel.roku.com', url:q => `https://therokuchannel.roku.com/search/${q}` },
+  { k:'youtube',   re:/youtube/,                         name:'YouTube',        domain:'youtube.com',        url:q => `https://www.youtube.com/results?search_query=${q}` },
+  { k:'fandango',  re:/fandango|vudu/,                   name:'Fandango at Home', domain:'fandango.com',     url:q => `https://athome.fandango.com/content/browse/search?searchString=${q}` },
+  { k:'crunchy',   re:/crunchyroll/,                     name:'Crunchyroll',    domain:'crunchyroll.com',    url:q => `https://www.crunchyroll.com/search?q=${q}` },
+  { k:'criterion', re:/criterion/,                       name:'Criterion Channel', domain:'criterionchannel.com', url:q => `https://www.criterionchannel.com/search?q=${q}` },
+  { k:'amc',       re:/^amc/,                            name:'AMC+',           domain:'amcplus.com',        url:q => `https://www.amcplus.com/search?q=${q}` },
+];
+
+function providerKey(name) {
+  return String(name).toLowerCase()
+    .replace(/\s+(amazon|apple tv|roku premium|youtube primetime)\s+channel$/, '')   // "Max Amazon Channel" -> "max"
+    .replace(/\s+apple tv$/, '')                                                     // "Acorn TV Apple TV" -> "acorn tv"
+    .replace(/\s+(standard |basic |premium )?with ads$/, '')                         // "Netflix Standard with Ads" -> "netflix"
+    .replace(/\s+(premium plus|premium|basic|standard|essential|select)$/, '')       // "Peacock Premium" -> "peacock"
+    .trim();
+}
+
+// One link per service, in TMDb's order. Services we have no search URL for share a single JustWatch link.
+function watchLinks(m) {
+  const t = encodeURIComponent(m.title), seen = new Set(), out = [];
+  let other = false;
+  (m.stream || []).forEach(n => {
+    const key = providerKey(n), sv = SERVICES.find(x => x.re.test(key));
+    if (!sv) { other = true; return; }
+    if (seen.has(sv.k)) return;
+    seen.add(sv.k);
+    out.push({ href: sv.url(t), domain: sv.domain, name: sv.name });
+  });
+  if (other) out.push({ href: `https://www.justwatch.com/us/search?q=${t}`, domain: 'justwatch.com', name: 'JustWatch' });
+  return out;
+}
+
+const fmtDate = d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
+
+function datesHtml(m) {
+  const theaters = fmtDate(m.theatrical || m.release) || '—';
+  const stream = fmtDate(m.digital) || (isStreaming(m) ? 'Available now' : (m.digital === undefined ? '' : 'Not yet'));
+  return `<p class="dates"><b>Theaters:</b> ${esc(theaters)}${stream ? `<br><b>Streaming:</b> ${esc(stream)}` : ''}</p>`;
+}
+
 function cardHtml(m, tabDef) {
   const q = encodeURIComponent(m.title + (m.release ? ' ' + m.release.slice(0, 4) : ''));
   const rtUrl = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(m.title)}`;
@@ -166,7 +222,7 @@ function cardHtml(m, tabDef) {
   return `<article class="card">
     <div class="thumb-wrap">${img}
       <label class="fav-toggle" title="Favorite"><input type="checkbox" class="fav-input" data-id="${m.id}" ${favs.has(m.id) ? 'checked' : ''}><span class="fav-star">★</span></label>
-      ${isStreaming(m) ? `<div class="stream-pill" title="${esc(m.stream.join(', '))}">▶ Streaming</div>` : m.rentbuy ? `<div class="stream-pill rent" title="Available to rent or buy${m.digital ? ' since ' + esc(m.digital) : ''}">Rent / Buy</div>` : ''}
+      ${isStreaming(m) ? `<div class="stream-pill" title="${esc(watchLinks(m).map(w => w.name).join(', '))}">▶ Streaming</div>` : m.rentbuy ? `<div class="stream-pill rent" title="Available to rent or buy${m.digital ? ' since ' + esc(m.digital) : ''}">Rent / Buy</div>` : ''}
       <div class="rank-pill" title="${esc(tabDef.hint)}">#${m.rank}</div>
     </div>
     <div class="body">
@@ -178,13 +234,13 @@ function cardHtml(m, tabDef) {
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${scoreCount(m)} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score)}</span></div>
-      ${isStreaming(m) ? `<p class="streamline">▶ ${esc(m.stream.slice(0, 3).join(', '))}${m.stream.length > 3 ? ` +${m.stream.length - 3}` : ''}</p>` : ''}
+      ${datesHtml(m)}
       <div class="links">
         ${icon(rtUrl, 'rottentomatoes.com', 'Rotten Tomatoes')}
         ${icon(imdbUrl, 'imdb.com', 'IMDb')}
         ${icon(ytUrl, 'youtube.com', 'YouTube')}
       </div>
+      ${isStreaming(m) ? `<p class="watch-label">Watch on</p><div class="links watch">${watchLinks(m).map(w => icon(w.href, w.domain, w.name)).join('')}</div>` : ''}
     </div>
   </article>`;
 }
