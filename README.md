@@ -32,6 +32,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
 * **Tiles are not clickable.** Under the score each card has three favicon links: **Rotten Tomatoes** (a search for the title, since OMDb no longer returns the exact page URL), **IMDb** (the movie's own page, built from `imdb_id`) and **YouTube** (the TMDb trailer, or a YouTube search for the trailer if TMDb has none).
+* **Streaming:** a green **▶ Streaming** pill on the poster (and the first three service names on the card) when the movie is on a US subscription or free-with-ads service; a grey **Rent / Buy** pill when it can only be rented or bought. The **▶ Streaming** button next to Favorites shows only streaming movies. Data is TMDb's watch providers (from JustWatch, US only), read in the same TMDb call as the trailers, so it costs no OMDb requests. It refreshes on each daily run; older history movies show no badge until they are refreshed.
 * **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
 * **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the three it used (for example `Avg 77 · 2 of 3`).
 
@@ -47,7 +48,7 @@ All three scores are put on a 0 to 100 scale and averaged evenly. If a movie is 
 
 ## How the data is built
 
-**Recent (daily, 06:17 UTC).** TMDb discover lists theatrical movies released from the first day of the month three months ago until today, most popular first (up to `RECENT_PAGES` x 20). For each movie it calls TMDb for details (includes trailers) and asks OMDb only if the movie has no OMDb data yet or the data is `REFRESH_DAYS` (7) old. This job spends at most `OMDB_RECENT_BUDGET` (300) OMDb requests, and usually far fewer once the window is filled.
+**Recent (daily, 06:17 UTC).** TMDb discover lists theatrical movies released from the first day of the month three months ago until today, most popular first (up to `RECENT_PAGES` x 20). For each movie it calls TMDb for details (includes trailers, US streaming providers and digital release date) and asks OMDb only if the movie has no OMDb data yet or the data is `REFRESH_DAYS` (7) old. This job spends at most `OMDB_RECENT_BUDGET` (300) OMDb requests, and usually far fewer once the window is filled.
 
 **History (daily, 09:17 UTC).** Uses whatever is left of the OMDb allowance: `OMDB_DAILY_LIMIT` (1000) minus `OMDB_MARGIN` (50) minus what the recent job spent. It works backwards one release month at a time, starting just before the recent window, taking movies with at least `HISTORY_MIN_VOTES` (50) TMDb votes, most-voted first. When the allowance runs out it saves and stops; the next day it resumes in the same month, then moves on. It stops at `HISTORY_FLOOR_YEAR` (1900). Each day adds more months, so history builds up over time.
 
@@ -63,6 +64,7 @@ Both workflows share one concurrency group and commit with a rebase-and-retry lo
 |---|---|
 | `id`, `imdb_id`, `title`, `release`, `overview` | Identity and summary |
 | `poster`, `trailer` | Image URL and YouTube URL (empty if none) |
+| `stream`, `rentbuy`, `digital` | US streaming services (subscription + free with ads), whether it can be rented or bought, and the US digital release date (empty if unknown) |
 | `rt`, `imdb`, `box` | The three scores (`null` if unknown). `imdb` is out of 10, `box` is dollars |
 | `bo_src` | `omdb` (domestic) or `tmdb` (worldwide) |
 | `score`, `n` | Evenly weighted average (0 to 100) and how many scores it used |

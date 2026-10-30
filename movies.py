@@ -148,6 +148,15 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         poster=("https://image.tmdb.org/t/p/w342" + pp) if pp else it.get("poster", ""),
         trailer=("https://www.youtube.com/watch?v=" + vids[0]["key"]) if vids else "",
         tmdb_revenue=d.get("revenue") or 0)
+    if "watch/providers" in d:      # US streaming (JustWatch data via TMDb); keep old values if TMDb didn't answer
+        prov = ((d.get("watch/providers") or {}).get("results") or {}).get("US") or {}
+        names = lambda k: [x["provider_name"] for x in prov.get(k, []) if x.get("provider_name")]
+        flat = names("flatrate")
+        it["stream"] = flat + [n for n in names("ads") if n not in flat]      # subscription + free-with-ads
+        it["rentbuy"] = bool(prov.get("rent") or prov.get("buy"))
+        us = next((x for x in (d.get("release_dates") or {}).get("results", []) if x.get("iso_3166_1") == "US"), {})
+        digital = sorted(r["release_date"][:10] for r in us.get("release_dates", []) if r.get("type") == 4 and r.get("release_date"))
+        it["digital"] = digital[0] if digital else ""
     if o:
         rt = next((num(r.get("Value")) for r in o.get("Ratings", []) if r.get("Source") == "Rotten Tomatoes"), None)
         it.update(rt=rt, imdb=num(o.get("imdbRating")), omdb_box=num(o.get("BoxOffice")), omdb_at=TODAY.isoformat())
@@ -200,7 +209,7 @@ def stale(old) -> bool:
 
 
 def refresh(mid, store: Store, o: Omdb):
-    d = tmdb(f"/movie/{mid}", append_to_response="videos", language="en-US")
+    d = tmdb(f"/movie/{mid}", append_to_response="videos,watch/providers,release_dates", language="en-US")
     if not d.get("id") or len(d.get("release_date") or "") < 10:
         return
     old = store.month(d["release_date"][:7]).get(str(mid))

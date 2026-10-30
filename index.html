@@ -39,6 +39,9 @@
   .thumb-wrap { position:relative; aspect-ratio:2/3; background:var(--panel); overflow:hidden; }
   .thumb-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
   .thumb-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
+  .stream-pill { position:absolute; left:8px; bottom:8px; z-index:2; border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; background:#1E9E5A; color:#fff; }
+  .stream-pill.rent { background:rgba(255,255,255,.93); color:var(--text-dim); border:1px solid var(--line); }
+  .streamline { font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:#1E7A4D; margin:0 0 8px; overflow-wrap:anywhere; }
   .rank-pill { position:absolute; top:8px; right:8px; z-index:2; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; }
   .fav-toggle { position:absolute; top:8px; left:8px; z-index:3; width:38px; height:38px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; cursor:pointer; }
   .fav-toggle input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
@@ -88,12 +91,13 @@
       <button class="sort-btn" data-sort="rank">Ranking</button>
       <button class="sort-btn" data-sort="date">Newest</button>
       <button class="sort-btn" id="favBtn" type="button">★ Favorites</button>
+      <button class="sort-btn" id="streamBtn" type="button" title="Only movies streaming in the US (subscription or free with ads)">▶ Streaming</button>
     </div>
   </div>
   <p class="count" id="count"></p>
   <div class="grid" id="grid"></div>
   <div id="sentinel" class="sentinel"></div>
-  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
+  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Streaming availability is TMDb data provided by <a href="https://www.justwatch.com/">JustWatch</a> (US). Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
 </main>
 <script>
 const MIN_SCORES = 2;   // a movie needs at least this many of its 3 scores to be ranked on the All tab
@@ -118,6 +122,8 @@ let tab = pref('movies_tab', 'all'); if (!TABS.some(t => t.k === tab)) tab = 'al
 let months = parseInt(pref('movies_months', '3'), 10); if (!MONTHS.includes(months)) months = 3;
 let sort = pref('movies_sort', 'rank') === 'date' ? 'date' : 'rank';
 let favOnly = pref('movies_favonly', '0') === '1';
+let streamOnly = pref('movies_streamonly', '0') === '1';
+const isStreaming = m => Array.isArray(m.stream) && m.stream.length > 0;
 let favs = new Set((() => { try { return JSON.parse(pref('movies_favs', '[]')); } catch { return []; } })());
 let index = null, items = [], shown = BATCH, lastKey = '', more = false;
 const shards = {};
@@ -160,6 +166,7 @@ function cardHtml(m, tabDef) {
   return `<article class="card">
     <div class="thumb-wrap">${img}
       <label class="fav-toggle" title="Favorite"><input type="checkbox" class="fav-input" data-id="${m.id}" ${favs.has(m.id) ? 'checked' : ''}><span class="fav-star">★</span></label>
+      ${isStreaming(m) ? `<div class="stream-pill" title="${esc(m.stream.join(', '))}">▶ Streaming</div>` : m.rentbuy ? `<div class="stream-pill rent" title="Available to rent or buy${m.digital ? ' since ' + esc(m.digital) : ''}">Rent / Buy</div>` : ''}
       <div class="rank-pill" title="${esc(tabDef.hint)}">#${m.rank}</div>
     </div>
     <div class="body">
@@ -172,6 +179,7 @@ function cardHtml(m, tabDef) {
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
       <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${scoreCount(m)} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score)}</span></div>
+      ${isStreaming(m) ? `<p class="streamline">▶ ${esc(m.stream.slice(0, 3).join(', '))}${m.stream.length > 3 ? ` +${m.stream.length - 3}` : ''}</p>` : ''}
       <div class="links">
         ${icon(rtUrl, 'rottentomatoes.com', 'Rotten Tomatoes')}
         ${icon(imdbUrl, 'imdb.com', 'IMDb')}
@@ -202,15 +210,16 @@ function render() {
     });
   list.forEach((m, i) => { m.rank = i + 1; });
   if (favOnly) list = list.filter(m => favs.has(m.id));
+  if (streamOnly) list = list.filter(isStreaming);
   if (sort === 'date') list.sort((a, b) => b.release.localeCompare(a.release) || a.rank - b.rank);
 
   $('count').textContent = `${list.length} movie${list.length === 1 ? '' : 's'}${months ? ` released in the last ${months} month${months === 1 ? '' : 's'}` : ''} · ranked by ${tabDef.hint.toLowerCase()}`;
   const grid = $('grid');
   if (!list.length) {
-    grid.innerHTML = `<div class="empty">${!index ? 'No data yet. Run the “Update recent movies” workflow once (Actions tab).' : favOnly ? 'No favorites in this window. Star a movie to pin it here.' : 'No movies match this tab and time frame. Try a longer period or All.'}</div>`;
+    grid.innerHTML = `<div class="empty">${!index ? 'No data yet. Run the “Update recent movies” workflow once (Actions tab).' : favOnly ? 'No favorites in this window. Star a movie to pin it here.' : streamOnly ? 'No streaming movies in this window yet. Streaming info is added on each daily update.' : 'No movies match this tab and time frame. Try a longer period or All.'}</div>`;
     more = false; $('sentinel').style.display = 'none'; return;
   }
-  const key = [tab, months, sort, favOnly].join('|');
+  const key = [tab, months, sort, favOnly, streamOnly].join('|');
   if (key !== lastKey) { lastKey = key; shown = BATCH; }
   const slice = list.slice(0, shown);
   grid.innerHTML = slice.map(m => cardHtml(m, tabDef)).join('');
@@ -233,6 +242,7 @@ function renderTabs() {
   $('tabs').innerHTML = MONTHS.map(m => `<button class="tab-btn${m === months ? ' active' : ''}" data-months="${m}">${label(m)}</button>`).join('');
   document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
   $('favBtn').classList.toggle('active', favOnly);
+  $('streamBtn').classList.toggle('active', streamOnly);
 }
 
 function setup() {
@@ -249,6 +259,7 @@ function setup() {
     sort = b.dataset.sort; setPref('movies_sort', sort); renderTabs(); render();
   }));
   $('favBtn').addEventListener('click', () => { favOnly = !favOnly; setPref('movies_favonly', favOnly ? 1 : 0); renderTabs(); render(); });
+  $('streamBtn').addEventListener('click', () => { streamOnly = !streamOnly; setPref('movies_streamonly', streamOnly ? 1 : 0); renderTabs(); render(); });
   $('grid').addEventListener('click', e => {
     const b = e.target.closest('[data-more]'); if (!b) return;
     const id = parseInt(b.dataset.more, 10), d = b.previousElementSibling;
