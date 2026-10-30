@@ -31,7 +31,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 * **Time frame:** 1, 2, 3, 6, 12 months or All, based on release date.
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
-* **Click a movie:** opens its YouTube trailer (from TMDb), or its TMDb page if there is no trailer. Cards with a trailer also show a Trailer link.
+* **Tiles are not clickable.** Under the score each card has three favicon links: **Rotten Tomatoes** (a search for the title, since OMDb no longer returns the exact page URL), **IMDb** (the movie's own page, built from `imdb_id`) and **YouTube** (the TMDb trailer, or a YouTube search for the trailer if TMDb has none).
 * **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
 * **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the three it used (for example `Avg 77 · 2 of 3`).
 
