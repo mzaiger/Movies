@@ -179,8 +179,22 @@ function cardHtml(m, tabDef) {
 function render() {
   const tabDef = TABS.find(t => t.k === tab);
   const cut = cutoffDate() ? cutoffDate().toISOString().slice(0, 10) : '';
+  // On Rotten Tomatoes and IMDb boards, break equal-score ties by box office.
+  // Movies without box-office data sort after movies that have it.
+  const compareBoxOffice = (a, b) => {
+    const aHasBox = a.box != null && Number.isFinite(Number(a.box));
+    const bHasBox = b.box != null && Number.isFinite(Number(b.box));
+    if (aHasBox !== bHasBox) return aHasBox ? -1 : 1;
+    if (aHasBox && bHasBox && Number(a.box) !== Number(b.box)) return Number(b.box) - Number(a.box);
+    return a.title.localeCompare(b.title);
+  };
   let list = items.filter(m => m.release >= cut && tabDef.f(m) != null)
-    .sort((a, b) => tabDef.f(b) - tabDef.f(a) || a.title.localeCompare(b.title));
+    .sort((a, b) => {
+      const scoreDifference = tabDef.f(b) - tabDef.f(a);
+      if (scoreDifference !== 0) return scoreDifference;
+      if (tab === 'rt' || tab === 'imdb') return compareBoxOffice(a, b);
+      return a.title.localeCompare(b.title);
+    });
   list.forEach((m, i) => { m.rank = i + 1; });
   if (favOnly) list = list.filter(m => favs.has(m.id));
   if (sort === 'date') list.sort((a, b) => b.release.localeCompare(a.release) || a.rank - b.rank);
