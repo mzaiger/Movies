@@ -57,11 +57,12 @@
   .chip { background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 2px; min-width:0; width:100%; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; }
   .chip small { display:block; font-size:11px; font-weight:500; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px; }
   .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
-  .links { display:flex; gap:8px; margin-top:10px; }
-  .links a { display:flex; align-items:center; justify-content:center; width:34px; height:34px; background:var(--panel); border:1px solid var(--line); border-radius:8px; transition:border-color .15s ease, background .15s ease; }
+  .links { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:100%; margin-top:10px; }
+  .links a { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:46px; background:var(--panel); border:1px solid var(--line); border-radius:8px; color:var(--blue); text-decoration:none; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; transition:border-color .15s ease, background .15s ease; }
   .links a:hover { border-color:var(--blue); background:#fff; }
   .links a:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
-  .links img { width:20px; height:20px; display:block; }
+  .links img { width:28px; height:28px; display:block; flex:none; }
+  .links .arrow { font-size:17px; line-height:1; }
   .empty { text-align:center; padding:70px 20px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:13px; grid-column:1/-1; }
   .sentinel { text-align:center; color:var(--text-dim); font-size:12px; padding:18px 0 30px; }
   .foot { margin-top:28px; padding-top:14px; border-top:1px solid var(--line); font-size:12px; line-height:1.6; color:var(--text-dim); }
@@ -152,7 +153,7 @@ function cardHtml(m, tabDef) {
   const rtUrl = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(m.title)}`;
   const imdbUrl = /^tt\d+$/.test(m.imdb_id || '') ? `https://www.imdb.com/title/${m.imdb_id}/` : `https://www.imdb.com/find/?q=${q}&s=tt`;
   const ytUrl = safeUrl(m.trailer) || `https://www.youtube.com/results?search_query=${encodeURIComponent(m.title + ' ' + (m.release ? m.release.slice(0, 4) + ' ' : '') + 'trailer')}`;
-  const icon = (href, domain, name) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="${esc(name)}" aria-label="${esc(name)}"><img src="https://www.google.com/s2/favicons?domain=${domain}&sz=64" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${name[0]}'))"></a>`;
+  const icon = (href, domain, name) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="${esc(name)}" aria-label="${esc(name)}"><img src="https://www.google.com/s2/favicons?domain=${domain}&sz=64" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${name[0]}'))"><span class="arrow">↗</span></a>`;
   const poster = safeUrl(m.poster);
   const img = poster ? `<img src="${esc(poster)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;thumb-fallback&quot;>No Poster</div>'">` : '<div class="thumb-fallback">No Poster</div>';
   const chip = (l, v, tip) => `<div class="chip" title="${esc(tip)}"><small>${l}</small>${v}</div>`;
