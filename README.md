@@ -32,6 +32,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
 * **Click a movie:** opens its YouTube trailer (from TMDb), or its TMDb page if there is no trailer. Cards with a trailer also show a Trailer link.
+* **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
 * **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the four it used (for example `Avg 77 · 3 of 4`).
 
 ### Scores
