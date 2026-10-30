@@ -32,9 +32,10 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
 * **Tiles are not clickable.** Under the score each card has three favicon links: **Rotten Tomatoes** (a search for the title, since OMDb no longer returns the exact page URL), **IMDb** (the movie's own page, built from `imdb_id`) and **YouTube** (the TMDb trailer, or a YouTube search for the trailer if TMDb has none).
-* **Streaming:** a green **▶ Streaming** pill on the poster (and the first three service names on the card) when the movie is on a US subscription or free-with-ads service; a grey **Rent / Buy** pill when it can only be rented or bought. The **▶ Streaming** button next to Favorites shows only streaming movies. Data is TMDb's watch providers (from JustWatch, US only), read in the same TMDb call as the trailers, so it costs no OMDb requests. It refreshes on each daily run; older history movies show no badge until they are refreshed.
+* **Release dates:** under the score each card shows **Theaters** (US theatrical date, or TMDb's release date) and **Streaming** (US digital release date from TMDb; "Available now" if it is on a service but TMDb has no date, "Not yet" otherwise).
+* **Streaming:** a green **▶ Streaming** pill on the poster when the movie is on a US subscription or free-with-ads service; a grey **Rent / Buy** pill when it can only be rented or bought. The **▶ Streaming** button next to Favorites shows only streaming movies. Data is TMDb's watch providers (from JustWatch, US only), read in the same TMDb call as the trailers, so it costs no OMDb requests. It refreshes on each daily run; older history movies show no badge until they are refreshed.
+* **Watch on:** one favicon + ↗ link per service that opens that service's own search for the movie title. Provider names that are the same service are merged (Netflix and Netflix Standard with Ads, Max Amazon Channel and HBO Max, Amazon Prime Video with Ads and Amazon Prime Video, and so on). Services without a search URL in the `SERVICES` list in `index.html` are combined into one JustWatch link. To add a service, add one line to `SERVICES`. Search URLs used: Netflix `/search?q=`, Hulu `/search?q=`, Disney+ `/search?q=`, HBO Max `play.hbomax.com/search?q=`, Prime Video `amazon.com/s?k=…&i=instant-video`, Apple TV `tv.apple.com/search?term=`, Paramount+ `/search/?q=`, Peacock `/search?q=`, Tubi `/search/<title>`, Pluto TV, Roku Channel, YouTube, Fandango at Home, Crunchyroll, Criterion Channel, AMC+.
 * **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
-* **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the three it used (for example `Avg 77 · 2 of 3`).
 
 ### Scores
 
@@ -64,7 +65,7 @@ Both workflows share one concurrency group and commit with a rebase-and-retry lo
 |---|---|
 | `id`, `imdb_id`, `title`, `release`, `overview` | Identity and summary |
 | `poster`, `trailer` | Image URL and YouTube URL (empty if none) |
-| `stream`, `rentbuy`, `digital` | US streaming services (subscription + free with ads), whether it can be rented or bought, and the US digital release date (empty if unknown) |
+| `stream`, `rentbuy`, `digital`, `theatrical` | US streaming service names (subscription + free with ads), whether it can be rented or bought, and the US digital and theatrical release dates (empty if unknown) |
 | `rt`, `imdb`, `box` | The three scores (`null` if unknown). `imdb` is out of 10, `box` is dollars |
 | `bo_src` | `omdb` (domestic) or `tmdb` (worldwide) |
 | `score`, `n` | Evenly weighted average (0 to 100) and how many scores it used |
