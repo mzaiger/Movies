@@ -16,6 +16,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 | File | What it is |
 |---|---|
 | `index.html` | The page: tabs, month filters, sort, favorites, poster tiles |
+| `img/hbo-max.png`, `img/amc-plus.png` | Logos used on the HBO Max and AMC+ links |
 | `movies.py` | Does all the work. `python movies.py recent` or `python movies.py history` |
 | `.github/workflows/movies-daily.yml` | Daily: downloads the last three months of movies |
 | `.github/workflows/movies-history.yml` | Daily: builds older history with the OMDb requests left over |
@@ -32,9 +33,9 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
 * **Tiles are not clickable.** Under the score each card has three favicon links: **Rotten Tomatoes** (a search for the title, since OMDb no longer returns the exact page URL), **IMDb** (the movie's own page, built from `imdb_id`) and **YouTube** (the TMDb trailer, or a YouTube search for the trailer if TMDb has none).
-* **Release dates:** under the score each card shows **Theaters** (US theatrical date, or TMDb's release date) and **Streaming** (US digital release date from TMDb; "Available now" if it is on a service but TMDb has no date, "Not yet" otherwise).
+* **Release dates:** at the bottom of each card shows **Theaters** (US theatrical date, or TMDb's release date) and **Streaming** (US digital release date from TMDb; "Available now" if it is on a service but TMDb has no date, "Not yet" otherwise).
 * **Streaming:** a green **▶ Streaming** pill on the poster when the movie is on a US subscription or free-with-ads service; a grey **Rent / Buy** pill when it can only be rented or bought. The **▶ Streaming** button next to Favorites shows only streaming movies. Data is TMDb's watch providers (from JustWatch, US only), read in the same TMDb call as the trailers, so it costs no OMDb requests. It refreshes on each daily run; older history movies show no badge until they are refreshed.
-* **Watch on:** one favicon + ↗ link per service that opens that service's own search for the movie title. Provider names that are the same service are merged (Netflix and Netflix Standard with Ads, Max Amazon Channel and HBO Max, Amazon Prime Video with Ads and Amazon Prime Video, and so on). Services without a search URL in the `SERVICES` list in `index.html` are combined into one JustWatch link. To add a service, add one line to `SERVICES`. Search URLs used: Netflix `/search?q=`, Hulu `/search?q=`, Disney+ `/search?q=`, HBO Max `play.hbomax.com/search?q=`, Prime Video `amazon.com/s?k=…&i=instant-video`, Apple TV `tv.apple.com/search?term=`, Paramount+ `/search/?q=`, Peacock `/search?q=`, Tubi `/search/<title>`, Pluto TV, Roku Channel, YouTube, Fandango at Home, Crunchyroll, Criterion Channel, AMC+.
+* **Get Tickets or Stream On:** a row of favicon + ↗ links under the Rotten Tomatoes / IMDb / YouTube row, on every card. The first is always **Fandango** (a Fandango search for the title, for tickets). After it comes one link per US streaming service the movie is on. Provider names that are the same service are merged (Netflix and Netflix Standard with Ads, Max Amazon Channel and HBO Max, Amazon Prime Video with Ads and Amazon Prime Video, and so on). HBO Max and AMC+ show their logo images from `img/` instead of a favicon. Peacock and Hulu do not accept a search in the URL, so those two open Peacock's search page (`peacocktv.com/watch/search`) and Hulu's search page (`hulu.com/search`). Services without an entry in the `SERVICES` list in `index.html` are combined into one JustWatch link; to add a service, add one line to `SERVICES`.
 * **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
 
 ### Scores

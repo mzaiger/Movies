@@ -155,8 +155,10 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         it["stream"] = flat + [n for n in names("ads") if n not in flat]      # subscription + free-with-ads
         it["rentbuy"] = bool(prov.get("rent") or prov.get("buy"))
         us = next((x for x in (d.get("release_dates") or {}).get("results", []) if x.get("iso_3166_1") == "US"), {})
-        digital = sorted(r["release_date"][:10] for r in us.get("release_dates", []) if r.get("type") == 4 and r.get("release_date"))
+        dates = lambda t: sorted(r["release_date"][:10] for r in us.get("release_dates", []) if r.get("type") in t and r.get("release_date"))
+        digital, theatrical = dates((4,)), dates((2, 3))      # 4 = digital, 3 = theatrical, 2 = limited theatrical
         it["digital"] = digital[0] if digital else ""
+        it["theatrical"] = theatrical[0] if theatrical else ""
     if o:
         rt = next((num(r.get("Value")) for r in o.get("Ratings", []) if r.get("Source") == "Rotten Tomatoes"), None)
         it.update(rt=rt, imdb=num(o.get("imdbRating")), omdb_box=num(o.get("BoxOffice")), omdb_at=TODAY.isoformat())
