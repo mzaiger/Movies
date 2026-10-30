@@ -163,7 +163,7 @@ async function loadData(force) {
 const SERVICES = [
   { k:'netflix',   re:/netflix/,                         name:'Netflix',        domain:'netflix.com',        url:q => `https://www.netflix.com/search?q=${q}` },
   { k:'hulu',      re:/^hulu/,                           name:'Hulu',           domain:'hulu.com',           url:() => 'https://www.hulu.com/search' },
-  { k:'disney',    re:/disney/,                          name:'Disney+',        domain:'disneyplus.com',     url:q => `https://www.disneyplus.com/search?q=${q}` },
+  { k:'disney',    re:/disney/,                          name:'Disney+',        domain:'disneyplus.com',     url:() => 'https://www.disneyplus.com/en-gb/browse/search' },
   { k:'max',       re:/^max$|hbo/,                       name:'HBO Max',        domain:'hbomax.com', img:'img/hbo-max.png', url:q => `https://play.hbomax.com/search?q=${q}` },
   { k:'prime',     re:/prime video|^amazon video|^amazon prime/, name:'Prime Video', domain:'primevideo.com', url:q => `https://www.amazon.com/s?k=${q}&i=instant-video` },
   { k:'apple',     re:/^apple tv/,                       name:'Apple TV',       domain:'tv.apple.com',       url:q => `https://tv.apple.com/search?term=${q}` },
