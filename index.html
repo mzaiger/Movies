@@ -58,9 +58,9 @@
   .more { align-self:flex-start; position:relative; z-index:2; background:none; border:none; padding:0; margin:0 0 8px; color:var(--blue); font-family:'IBM Plex Mono',monospace; font-size:11.5px; }
   .more:hover { text-decoration:underline; }
   .more[hidden] { display:none; }
-  .chips { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto 0 8px; }
-  .chip { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:3px 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500; }
-  .chip small { display:block; font-size:9px; font-weight:400; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; }
+  .chips { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:100%; margin:auto 0 8px; }
+  .chip { background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 2px; min-width:0; width:100%; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; }
+  .chip small { display:block; font-size:11px; font-weight:500; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px; }
   .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
   .links { display:flex; flex-wrap:wrap; gap:4px 10px; margin-top:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; position:relative; z-index:2; }
   .links a { color:var(--blue); text-decoration:none; }
@@ -170,7 +170,7 @@ function cardHtml(m, tabDef) {
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${scoreCount(m)} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + scoreCount(m) + ' of 3'}</span></div>
+      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${scoreCount(m)} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score)}</span></div>
       ${trailer ? `<div class="links"><a href="${esc(trailer)}" target="_blank" rel="noopener noreferrer">Trailer ↗</a></div>` : ''}
     </div>
   </article>`;
