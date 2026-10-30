@@ -6,7 +6,7 @@ A static movie board in the same style as Trending Topics. **TMDb** supplies the
 
 | Secret name | Service | Used for |
 |---|---|---|
-| `TMDB_Key` | [The Movie Database (TMDb)](https://www.themoviedb.org/settings/api) | Movie lists, poster URL, YouTube trailer, summary, worldwide revenue |
+| `TMDB_Key` | [The Movie Database (TMDb)](https://www.themoviedb.org/settings/api) | Movie lists, poster URL, YouTube trailer, summary, user score, worldwide revenue |
 | `OMDB_Key` | [OMDb](https://www.omdbapi.com/) | Rotten Tomatoes %, IMDb rating, domestic box office |
 
 Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be either the v3 API key or the v4 read access token; the script detects which. Locally, set environment variables with the same names (`TMDB_Key`, `OMDB_Key`).
@@ -27,23 +27,26 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 
 ## The page
 
-* **Tabs:** All, Rotten Tomatoes, IMDb, Box Office. Each ranks the movies by that score. All averages the available scores with equal weight, and only ranks movies that have at least 2 of the 3 (`MIN_SCORES` at the top of the script in `index.html`). The single-score tabs show any movie that has that score.
+* **Tabs:** All, Rotten Tomatoes, Audience, IMDb, Box Office. Each ranks the movies by that score. All averages the available scores with equal weight, and only ranks movies that have at least 3 of the 4 (`MIN_SCORES` at the top of the script in `index.html`). The single-score tabs show any movie that has that score.
 * **Time frame:** 1, 2, 3, 6, 12 months or All, based on release date.
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
 * **Click a movie:** opens its YouTube trailer (from TMDb), or its TMDb page if there is no trailer. Cards with a trailer also show a Trailer link.
 * **Descriptions** are cut to 3 lines with a **See more** link when they are longer.
-* **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the three it used (for example `Avg 77 · 2 of 3`).
+* **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the four it used (for example `Avg 77 · 3 of 4`).
 
 ### Scores
 
-All three scores are put on a 0 to 100 scale and averaged evenly. If a movie is missing one (new movies often have no Rotten Tomatoes score), the average uses what it has, and `n` says how many. The data files keep every movie, but the All tab hides those with fewer than 2 scores.
+All four scores are put on a 0 to 100 scale and averaged evenly. If a movie is missing one (new movies often have no Rotten Tomatoes score), the average uses what it has, and `n` says how many. The data files keep every movie, but the All tab hides those with fewer than 3 scores.
 
 | Score | Source | Scale |
 |---|---|---|
 | Rotten Tomatoes | OMDb `Ratings` (critic Tomatometer) | Percent as is |
+| Audience | TMDb user score (needs 10+ votes) | Rating x 10 |
 | IMDb | OMDb `imdbRating` | Rating x 10 |
 | Box Office | OMDb `BoxOffice` (domestic); TMDb `revenue` (worldwide) if OMDb has none | Log scale: $100K = 0, $1B = 100 |
+
+**Popcornmeter:** neither TMDb nor OMDb provides Rotten Tomatoes' audience score, and scraping Rotten Tomatoes is against its terms. The TMDb user score stands in, labeled "Audience". The movie JSON has an `aud` field; to use the real Popcornmeter, change the `it["aud"] = ...` line in `movies.py` to read it from a paid provider.
 
 ## How the data is built
 
@@ -63,7 +66,7 @@ Both workflows share one concurrency group and commit with a rebase-and-retry lo
 |---|---|
 | `id`, `imdb_id`, `title`, `release`, `overview` | Identity and summary |
 | `poster`, `trailer` | Image URL and YouTube URL (empty if none) |
-| `rt`, `imdb`, `box` | The three scores (`null` if unknown). `imdb` is out of 10, `box` is dollars |
+| `rt`, `imdb`, `aud`, `box` | The four scores (`null` if unknown). `imdb` is out of 10, `box` is dollars |
 | `bo_src` | `omdb` (domestic) or `tmdb` (worldwide) |
 | `score`, `n` | Evenly weighted average (0 to 100) and how many scores it used |
 | `omdb_at` | Date OMDb was last asked |

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Movie Board data builder.   python movies.py recent    |    python movies.py history
 
-TMDb (secret TMDB_Key): movie lists, poster, trailer, overview, revenue fallback.
+TMDb (secret TMDB_Key): movie lists, poster, trailer, overview, user score, revenue fallback.
 OMDb (secret OMDB_Key): Rotten Tomatoes %, IMDb rating, domestic box office.
 Movies are stored one JSON file per release month (data/YYYY-MM.json) plus data/index.json.
 """
@@ -147,6 +147,7 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         overview=d.get("overview") or "", imdb_id=d.get("imdb_id") or "",
         poster=("https://image.tmdb.org/t/p/w342" + pp) if pp else it.get("poster", ""),
         trailer=("https://www.youtube.com/watch?v=" + vids[0]["key"]) if vids else "",
+        tmdb_user=round(d["vote_average"] * 10, 1) if (d.get("vote_count") or 0) >= 10 else None,
         tmdb_revenue=d.get("revenue") or 0)
     if o:
         rt = next((num(r.get("Value")) for r in o.get("Ratings", []) if r.get("Source") == "Rotten Tomatoes"), None)
@@ -157,8 +158,8 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         it.setdefault(k, None)
     box = it["omdb_box"] or it["tmdb_revenue"] or None      # domestic (OMDb) first, worldwide (TMDb) if missing
     it["box"], it["bo_src"] = box, ("omdb" if it["omdb_box"] else "tmdb" if box else "")
-    it.pop("aud", None); it.pop("tmdb_user", None)   # audience score was removed; drop it from older saved items
-    parts = [it["rt"], it["imdb"] * 10 if it["imdb"] is not None else None, box_score(box)]
+    it["aud"] = it["tmdb_user"]          # Popcornmeter is not in OMDb or TMDb; TMDb user score stands in (README)
+    parts = [it["rt"], it["aud"], it["imdb"] * 10 if it["imdb"] is not None else None, box_score(box)]
     parts = [p for p in parts if p is not None]
     it["score"] = round(sum(parts) / len(parts), 1) if parts else None   # all available scores, weighted evenly
     it["n"] = len(parts)

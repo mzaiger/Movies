@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=0.7125">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Movie Board</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,7 +27,7 @@
   .sub { color:var(--text-dim); font-size:13px; margin:0; max-width:900px; line-height:1.5; }
   main { max-width:1700px; margin:0 auto; padding:0 24px 60px; }
   .controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 16px; margin:4px 0 14px; position:sticky; top:0; padding:10px 0; background:linear-gradient(var(--bg) 78%, transparent); z-index:10; }
-  .tabs { display:flex; flex-wrap:wrap; gap:2px; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; }
+  .tabs { display:flex; flex-wrap:wrap; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; }
   .tab-btn { font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.04em; text-transform:uppercase; font-size:12.5px; color:var(--text-dim); background:transparent; border:none; border-radius:999px; padding:7px 14px; }
   .tab-btn:hover { color:var(--text); }
   .tab-btn.active { background:var(--blue); color:#fff; }
@@ -79,7 +79,7 @@
     <div class="updated-row"><span id="lastUpdated">Last updated: —</span><button class="refresh-btn" id="refreshBtn" type="button">Refresh</button></div>
   </div>
   <h1>Movie Board</h1>
-  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 2 of the 3. Pick a tab to rank by one score, filter by release date in months, and star a movie to keep it handy. Click a poster to watch the trailer.</p>
+  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the audience score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 3 of the 4. Pick a tab to rank by one score, filter by release date in months, and star a movie to keep it handy. Click a poster to watch the trailer.</p>
 </header>
 <main>
   <div class="controls">
@@ -95,13 +95,14 @@
   <p class="count" id="count"></p>
   <div class="grid" id="grid"></div>
   <div id="sentinel" class="sentinel"></div>
-  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
+  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Rotten Tomatoes and IMDb are not affiliated with this site. The audience score is the TMDb user score (Rotten Tomatoes&rsquo; Popcornmeter is not available through either API). Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
 </main>
 <script>
-const MIN_SCORES = 2;   // a movie needs at least this many of its 3 scores to be ranked on the All tab
+const MIN_SCORES = 3;   // a movie needs at least this many of its 4 scores to be ranked on the All tab
 const TABS = [
-  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 3)`, f: m => m.n >= MIN_SCORES ? m.score : null },
+  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 4)`, f: m => m.n >= MIN_SCORES ? m.score : null },
   { k: 'rt',   l: 'Rotten Tomatoes', hint: 'Rotten Tomatoes critic score',                    f: m => m.rt },
+  { k: 'aud',  l: 'Audience',        hint: 'Audience score (TMDb user score)',                f: m => m.aud },
   { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
   { k: 'box',  l: 'Box Office',      hint: 'Box office gross',                                f: m => m.box },
 ];
@@ -165,10 +166,11 @@ function cardHtml(m, tabDef) {
       ${m.overview ? `<button class="more" type="button" data-more="${m.id}"${expanded.has(m.id) ? '' : ' hidden'}>${expanded.has(m.id) ? 'See less' : 'See more'}</button>` : ''}
       <div class="chips">
         ${chip('RT', m.rt == null ? '—' : Math.round(m.rt) + '%', 'Rotten Tomatoes critic score')}
+        ${chip('Aud', m.aud == null ? '—' : Math.round(m.aud) + '%', 'Audience score (TMDb user score)')}
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${m.n} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + m.n + ' of 3'}</span></div>
+      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${m.n} score(s) this movie has, out of the 4 (Rotten Tomatoes, Audience, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + m.n + ' of 4'}</span></div>
       ${trailer ? `<div class="links"><a href="${esc(trailer)}" target="_blank" rel="noopener noreferrer">Trailer ↗</a></div>` : ''}
     </div>
   </article>`;
