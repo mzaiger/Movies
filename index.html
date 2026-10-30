@@ -52,7 +52,7 @@
   .fav-toggle input:focus-visible ~ .fav-star { outline:2px solid var(--blue); border-radius:4px; }
   .body { padding:12px 14px 13px; display:flex; flex-direction:column; flex:1; }
   .title { font-size:15.5px; line-height:1.3; font-weight:600; margin:0 0 6px; }
-  .desc { font-size:14px; line-height:1.5; color:#3B5169; margin:0 0 10px; overflow-wrap:anywhere; }
+  .desc { font-size:12px; line-height:1.4; color:#3B5169; margin:0 0 10px; overflow-wrap:anywhere; }
   .desc.none { font-style:italic; opacity:.8; }
   .chips { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto 0 8px; }
   .chip { background:var(--panel); border:1px solid var(--line); border-radius:6px; padding:3px 0; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:500; }
@@ -75,7 +75,7 @@
     <div class="updated-row"><span id="lastUpdated">Last updated: —</span><button class="refresh-btn" id="refreshBtn" type="button">Refresh</button></div>
   </div>
   <h1>Movie Board</h1>
-  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the audience score, the IMDb rating and the box office with equal weight. Pick a tab to rank by one score, filter by release date in months, and star a movie to keep it handy. Click a poster to watch the trailer.</p>
+  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the audience score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 3 of the 4. Pick a tab to rank by one score, filter by release date in months, and star a movie to keep it handy. Click a poster to watch the trailer.</p>
 </header>
 <main>
   <div class="controls">
@@ -94,8 +94,9 @@
   <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Rotten Tomatoes and IMDb are not affiliated with this site. The audience score is the TMDb user score (Rotten Tomatoes&rsquo; Popcornmeter is not available through either API). Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
 </main>
 <script>
+const MIN_SCORES = 3;   // a movie needs at least this many of its 4 scores to be ranked on the All tab
 const TABS = [
-  { k: 'all',  l: 'All',             hint: 'Average of every available score, weighted evenly', f: m => m.score },
+  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 4)`, f: m => m.n >= MIN_SCORES ? m.score : null },
   { k: 'rt',   l: 'Rotten Tomatoes', hint: 'Rotten Tomatoes critic score',                    f: m => m.rt },
   { k: 'aud',  l: 'Audience',        hint: 'Audience score (TMDb user score)',                f: m => m.aud },
   { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
@@ -144,7 +145,6 @@ async function loadData(force) {
 }
 
 function cardHtml(m, tabDef) {
-  const q = encodeURIComponent(`${m.title} ${m.release.slice(0, 4)} movie`);
   const trailer = safeUrl(m.trailer);
   const main = trailer || `https://www.themoviedb.org/movie/${m.id}`;
   const poster = safeUrl(m.poster);
@@ -164,13 +164,8 @@ function cardHtml(m, tabDef) {
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="meta"><span>${esc(m.release)}</span><span title="Average of ${m.n} score(s)">${m.score == null ? '—' : 'All ' + Math.round(m.score)}</span></div>
-      <div class="links">
-        ${trailer ? `<a href="${esc(trailer)}" target="_blank" rel="noopener noreferrer">Trailer ↗</a>` : ''}
-        <a href="https://www.google.com/search?q=${q}" target="_blank" rel="noopener noreferrer">Google ↗</a>
-        <a href="https://www.reddit.com/search/?q=${q}" target="_blank" rel="noopener noreferrer">Reddit ↗</a>
-        <a href="https://x.com/search?q=${q}" target="_blank" rel="noopener noreferrer">Social ↗</a>
-      </div>
+      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${m.n} score(s) this movie has, out of the 4 (Rotten Tomatoes, Audience, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + m.n + ' of 4'}</span></div>
+      ${trailer ? `<div class="links"><a href="${esc(trailer)}" target="_blank" rel="noopener noreferrer">Trailer ↗</a></div>` : ''}
     </div>
   </article>`;
 }

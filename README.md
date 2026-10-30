@@ -27,15 +27,16 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 
 ## The page
 
-* **Tabs:** All, Rotten Tomatoes, Audience, IMDb, Box Office. Each ranks the movies by that score. All averages the available scores with equal weight.
+* **Tabs:** All, Rotten Tomatoes, Audience, IMDb, Box Office. Each ranks the movies by that score. All averages the available scores with equal weight, and only ranks movies that have at least 3 of the 4 (`MIN_SCORES` at the top of the script in `index.html`). The single-score tabs show any movie that has that score.
 * **Time frame:** 1, 2, 3, 6, 12 months or All, based on release date.
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
-* **Click a movie:** opens its YouTube trailer (from TMDb), or its TMDb page if there is no trailer. Each card also has Google, Reddit and Social (X) search links.
+* **Click a movie:** opens its YouTube trailer (from TMDb), or its TMDb page if there is no trailer. Cards with a trailer also show a Trailer link.
+* **Avg on each card:** the evenly weighted average of the scores the movie has, with how many of the four it used (for example `Avg 77 · 3 of 4`).
 
 ### Scores
 
-All four scores are put on a 0 to 100 scale and averaged evenly. If a movie is missing one (new movies often have no Rotten Tomatoes score), the average uses what it has, and `n` says how many.
+All four scores are put on a 0 to 100 scale and averaged evenly. If a movie is missing one (new movies often have no Rotten Tomatoes score), the average uses what it has, and `n` says how many. The data files keep every movie, but the All tab hides those with fewer than 3 scores.
 
 | Score | Source | Scale |
 |---|---|---|
