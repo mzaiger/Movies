@@ -99,8 +99,10 @@
 </main>
 <script>
 const MIN_SCORES = 2;   // a movie needs at least this many of its 3 scores to be ranked on the All tab
+// Derive the count from the actual score fields, not the stored n value (which may be stale in older JSON).
+const scoreCount = m => [m.rt, m.imdb, m.box].filter(v => v != null && Number.isFinite(Number(v))).length;
 const TABS = [
-  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 3)`, f: m => m.n >= MIN_SCORES ? m.score : null },
+  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 3)`, f: m => scoreCount(m) >= MIN_SCORES ? m.score : null },
   { k: 'rt',   l: 'Rotten Tomatoes', hint: 'Rotten Tomatoes critic score',                    f: m => m.rt },
   { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
   { k: 'box',  l: 'Box Office',      hint: 'Box office gross',                                f: m => m.box },
@@ -168,7 +170,7 @@ function cardHtml(m, tabDef) {
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${m.n} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + m.n + ' of 3'}</span></div>
+      <div class="meta"><span>${esc(m.release)}</span><span title="Average of the ${scoreCount(m)} score(s) this movie has, out of the 3 (Rotten Tomatoes, IMDb, Box Office), weighted evenly">${m.score == null ? '—' : 'Avg ' + Math.round(m.score) + ' · ' + scoreCount(m) + ' of 3'}</span></div>
       ${trailer ? `<div class="links"><a href="${esc(trailer)}" target="_blank" rel="noopener noreferrer">Trailer ↗</a></div>` : ''}
     </div>
   </article>`;
