@@ -144,7 +144,13 @@ const shards = {};
 const expanded = new Set();   // movies whose full description is open
 
 const cutoffDate = () => months ? new Date(Date.now() - months * 30.44 * 864e5) : null;
-const money = v => v == null ? '—' : v >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` : v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${Math.round(v / 1e3)}K`;
+const money = v => {
+  if (v == null) return '—';
+  const k = Math.round(v / 1e3);
+  if (k >= 1e6) return `$${Math.round(v / 1e9)}B`;
+  if (k >= 1e3) { const m = Math.round(v / 1e6); return m >= 1e3 ? `$${Math.round(v / 1e9)}B` : `$${m}M`; }
+  return `$${k}K`;
+};
 const span = m => m >= 24 && m % 12 === 0 ? `${m / 12} year${m === 12 ? '' : 's'}` : `${m} month${m === 1 ? '' : 's'}`;
 const label = m => m === 0 ? 'All' : span(m).replace(/\b\w/g, c => c.toUpperCase());
 function ago(iso) {
