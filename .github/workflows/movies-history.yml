@@ -27,7 +27,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Add older movies with the leftover OMDb requests
+      - name: Add older movies (and refresh them on later passes) with the leftover OMDb requests
         env:
           TMDB_Key: ${{ secrets.TMDB_Key }}
           OMDB_Key: ${{ secrets.OMDB_Key }}

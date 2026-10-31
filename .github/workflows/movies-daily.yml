@@ -27,7 +27,7 @@ jobs:
 
       - run: pip install -r requirements.txt
 
-      - name: Download the last three months of movies
+      - name: Download the last 12 months of movies
         env:
           TMDB_Key: ${{ secrets.TMDB_Key }}
           OMDB_Key: ${{ secrets.OMDB_Key }}
