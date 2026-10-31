@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Movie Board data builder.   python movies.py recent    |    python movies.py history
+"""Movie Board data builder.   python movies.py recent    |    python movies.py history    |    python movies.py index
 
 TMDb (secret TMDB_Key): movie lists, poster, trailer, overview, revenue fallback.
 OMDb (secret OMDB_Key): Rotten Tomatoes %, IMDb rating, domestic box office.
@@ -24,8 +24,8 @@ DATA, STATE = Path("data"), Path("state")
 OMDB_LIMIT = int(os.environ.get("OMDB_DAILY_LIMIT", "1000"))
 OMDB_MARGIN = int(os.environ.get("OMDB_MARGIN", "50"))          # requests never spent
 RECENT_BUDGET = int(os.environ.get("OMDB_RECENT_BUDGET", "300"))  # most the daily job may spend
-RECENT_MONTHS = 3
-RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "15"))        # 20 movies per page
+RECENT_MONTHS = int(os.environ.get("RECENT_MONTHS", "12"))      # how far back the daily job looks
+RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per page (50 = top 1000 by popularity)
 REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
 HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
 HIST_FLOOR = int(os.environ.get("HISTORY_FLOOR_YEAR", "1900"))
@@ -177,9 +177,17 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
 
 
 # ---------- storage: one file per release month ----------
+SCORE_COLS = ["id", "release", "rt", "imdb", "box", "score", "st"]
+
+
+def score_row(m: dict) -> list:
+    """One compact row per movie for data/scores.json (st = 1 if on a US subscription/free-with-ads service)."""
+    return [m["id"], m["release"], m.get("rt"), m.get("imdb"), m.get("box"), m.get("score"), 1 if m.get("stream") else 0]
+
+
 class Store:
     def __init__(self):
-        self.s, self.dirty = {}, set()
+        self.s, self.dirty, self.rows = {}, set(), {}
 
     def month(self, ym):
         if ym not in self.s:
@@ -190,14 +198,25 @@ class Store:
         self.month(it["release"][:7])[str(it["id"])] = it
         self.dirty.add(it["release"][:7])
 
+    def _rows(self, ym):
+        items = self.s[ym].values() if ym in self.s else read(DATA / f"{ym}.json", {}).get("items", [])
+        return [score_row(m) for m in items if m.get("release")]
+
     def save(self):
+        """Write changed month files, then rebuild data/index.json and data/scores.json (every movie's scores, for the page's ranking)."""
         stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
         for ym in self.dirty:
             items = sorted(self.s[ym].values(), key=lambda m: -(m.get("score") or -1))
             write(DATA / f"{ym}.json", {"month": ym, "updated": stamp, "items": items})
+            self.rows[ym] = self._rows(ym)
         self.dirty.clear()
-        months = sorted(((p.stem, len(read(p, {}).get("items", []))) for p in DATA.glob("????-??.json")), reverse=True)
+        for p in DATA.glob("????-??.json"):
+            if p.stem not in self.rows:
+                self.rows[p.stem] = self._rows(p.stem)
+        months = sorted(((ym, len(r)) for ym, r in self.rows.items() if r), reverse=True)
         write(DATA / "index.json", {"updated": stamp, "months": [{"m": m, "n": n} for m, n in months]})
+        write(DATA / "scores.json", {"updated": stamp, "cols": SCORE_COLS,
+                                     "rows": [r for ym, _ in months for r in self.rows[ym]]})
 
 
 def checkpoint(store: Store, o: Omdb):
@@ -210,12 +229,15 @@ def stale(old) -> bool:
     return not old or not old.get("omdb_at") or (TODAY - date.fromisoformat(old["omdb_at"])).days >= REFRESH_DAYS
 
 
-def refresh(mid, store: Store, o: Omdb):
+def refresh(mid, store: Store, o: Omdb, hp=None):
     d = tmdb(f"/movie/{mid}", append_to_response="videos,watch/providers,release_dates", language="en-US")
     if not d.get("id") or len(d.get("release_date") or "") < 10:
         return
     old = store.month(d["release_date"][:7]).get(str(mid))
-    store.put(build(d, old, o.get(d.get("imdb_id")) if stale(old) else None))
+    it = build(d, old, o.get(d.get("imdb_id")) if stale(old) else None)
+    if hp is not None:
+        it["hp"] = hp                       # which history pass last checked this movie
+    store.put(it)
 
 
 # ---------- jobs ----------
@@ -236,23 +258,32 @@ def run_recent():
 
 
 def run_history():
+    """Walk backwards one release month at a time. When it reaches the floor year it starts a new pass
+    (pass 2, 3, ...) from the edge of the recent window and re-checks every movie, so streaming changes get picked up."""
     store, o = Store(), Omdb(budget_left())
     state = read(STATE / "history_state.json", {})
-    cur = state.get("next_month") or add_months(TODAY.strftime("%Y-%m"), -(RECENT_MONTHS + 1))
-    print(f"History from {cur}; OMDb budget {o.left}")
-    n = 0
+    pas = state.get("pass", 1)
+    fresh_start = lambda: add_months(TODAY.strftime("%Y-%m"), -(RECENT_MONTHS + 1))
+    cur = state.get("next_month") or fresh_start()
+    print(f"History pass {pas} from {cur}; OMDb budget {o.left}")
+    n, finished_pass = 0, False
     try:
-        while int(cur[:4]) >= HIST_FLOOR and not o.exhausted():
+        while True:
+            if int(cur[:4]) < HIST_FLOOR:          # reached the oldest year: the pass is done
+                finished_pass = True
+                break
             a, b = month_bounds(cur)
             ids = list(discover(**{"primary_release_date.gte": a, "primary_release_date.lte": b,
                                    "vote_count.gte": HIST_MIN_VOTES, "sort_by": "vote_count.desc"}))
             have = store.month(cur)
+            # Do a movie if it is new, or if an earlier pass did it (items saved before passes existed count as pass 1).
+            todo = [i for i in ids if str(i) not in have or have[str(i)].get("hp", 1) != pas]
             finished = True
-            for mid in (i for i in ids if str(i) not in have):
-                if o.exhausted():
+            for mid in todo:
+                if stale(have.get(str(mid))) and o.exhausted():     # only stop when this movie would need OMDb
                     finished = False
                     break
-                refresh(mid, store, o)
+                refresh(mid, store, o, hp=pas)
                 n += 1
                 if n % 100 == 0:
                     checkpoint(store, o)
@@ -260,16 +291,29 @@ def run_history():
                 break
             print(f"{cur} complete ({len(store.month(cur))} movies)")
             cur = add_months(cur, -1)
-            write(STATE / "history_state.json", {"next_month": cur})
+            write(STATE / "history_state.json", {"next_month": cur, "pass": pas})
     finally:
         checkpoint(store, o)
-    print("History is complete." if int(cur[:4]) < HIST_FLOOR else f"Stopped at {cur}; OMDb allowance used for today.")
+    if finished_pass:
+        pas += 1
+        write(STATE / "history_state.json", {"next_month": fresh_start(), "pass": pas})
+        print(f"Pass {pas - 1} reached {HIST_FLOOR}. Pass {pas} will start again from the recent window tomorrow.")
+    else:
+        print(f"Stopped at {cur}; OMDb allowance used for today.")
+
+
+def run_index():
+    """Rebuild data/index.json and data/scores.json from the month files. No API calls, no keys needed."""
+    Store().save()
+    print("Rebuilt data/index.json and data/scores.json.")
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["index"]:
+        run_index(); sys.exit(0)
     if not TMDB_KEY:
         sys.exit("TMDB_Key is not set.")
     if not OMDB_KEY:
         print("Warning: OMDB_Key is not set, so there will be no Rotten Tomatoes, IMDb or domestic box office data.")
     job = {"recent": run_recent, "history": run_history}.get(sys.argv[1] if len(sys.argv) > 1 else "")
-    job() if job else sys.exit("usage: python movies.py recent | history")
+    job() if job else sys.exit("usage: python movies.py recent | history | index")

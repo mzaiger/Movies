@@ -31,6 +31,7 @@
   .tab-btn { font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.04em; text-transform:uppercase; font-size:12.5px; color:var(--text-dim); background:transparent; border:none; border-radius:999px; padding:7px 14px; }
   .tab-btn:hover { color:var(--text); }
   .tab-btn.active { background:var(--blue); color:#fff; }
+  .timeframes { display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
   .tabs.sources .tab-btn { font-size:14px; padding:8px 18px; }
   .sort { display:flex; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
   .count { font-family:'IBM Plex Mono',monospace; color:var(--text-dim); font-size:12px; margin:0 0 12px; }
@@ -45,7 +46,7 @@
   .dates { font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--text-dim); margin:8px 0 0; line-height:1.55; }
   .dates b { font-weight:600; color:var(--text); }
   .watch-label { font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; color:#1E7A4D; margin:10px 0 0; }
-  .links.watch { margin-top:6px; }
+  .links.watch, .links.scores { margin-top:6px; }
   .fav-toggle { position:absolute; top:8px; left:8px; z-index:3; width:38px; height:38px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; cursor:pointer; }
   .fav-toggle input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
   .fav-star { font-size:20px; line-height:1; color:var(--text-dim); pointer-events:none; transition:color .15s ease, transform .15s ease; }
@@ -84,12 +85,15 @@
     <div class="updated-row"><span id="lastUpdated">Last updated: —</span><button class="refresh-btn" id="refreshBtn" type="button">Refresh</button></div>
   </div>
   <h1>Movie Board</h1>
-  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 2 of the 3. Pick a tab to rank by one score, filter by release date in months, and star a movie to keep it handy. Use the icons under each score to open Rotten Tomatoes, IMDb or the YouTube trailer.</p>
+  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 2 of the 3. Pick a tab to rank by one score, filter by release date (1 to 12 months, or 2, 5, 10, 20 years), and star a movie to keep it handy. Under “Score Links and Trailer”, use the icons to open Rotten Tomatoes, IMDb or the YouTube trailer.</p>
 </header>
 <main>
   <div class="controls">
     <div class="tabs sources" id="sources"></div>
-    <div class="tabs" id="tabs"></div>
+    <div class="timeframes" id="timeframes">
+      <div class="tabs" id="tabs"></div>
+      <div class="tabs" id="tabsYears"></div>
+    </div>
     <div class="sort">
       <span>Sort</span>
       <button class="sort-btn" data-sort="rank">Ranking</button>
@@ -113,7 +117,9 @@ const TABS = [
   { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
   { k: 'box',  l: 'Box Office',      hint: 'Box office gross',                                f: m => m.box },
 ];
-const MONTHS = [1, 2, 3, 6, 12, 0];
+const MONTHS = [1, 2, 3, 6, 12];            // first row
+const YEARS = [24, 60, 120, 240, 0];        // second row, in months: 2, 5, 10, 20 years, All
+const FRAMES = [...MONTHS, ...YEARS];
 const BATCH = 30;
 const $ = id => document.getElementById(id);
 const ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
@@ -123,19 +129,21 @@ const pref = (k, f) => { try { return localStorage.getItem(k) ?? f; } catch { re
 const setPref = (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} };
 
 let tab = pref('movies_tab', 'all'); if (!TABS.some(t => t.k === tab)) tab = 'all';
-let months = parseInt(pref('movies_months', '3'), 10); if (!MONTHS.includes(months)) months = 3;
+let months = parseInt(pref('movies_months', '3'), 10); if (!FRAMES.includes(months)) months = 3;
 let sort = pref('movies_sort', 'rank') === 'date' ? 'date' : 'rank';
 let favOnly = pref('movies_favonly', '0') === '1';
 let streamOnly = pref('movies_streamonly', '0') === '1';
-const isStreaming = m => Array.isArray(m.stream) && m.stream.length > 0;
+const isStreaming = m => m.st === 1 || (Array.isArray(m.stream) && m.stream.length > 0);
 let favs = new Set((() => { try { return JSON.parse(pref('movies_favs', '[]')); } catch { return []; } })());
-let index = null, items = [], shown = BATCH, lastKey = '', more = false;
+let index = null, items = [], shown = BATCH, lastKey = '', more = false, lastLen = 0, renderGen = 0;
+const detail = {};   // id -> full movie (poster, summary, trailer...), filled from month files as cards are needed
 const shards = {};
 const expanded = new Set();   // movies whose full description is open
 
 const cutoffDate = () => months ? new Date(Date.now() - months * 30.44 * 864e5) : null;
 const money = v => v == null ? '—' : v >= 1e9 ? `$${(v / 1e9).toFixed(2)}B` : v >= 1e6 ? `$${(v / 1e6).toFixed(1)}M` : `$${Math.round(v / 1e3)}K`;
-const label = m => m === 0 ? 'All' : m === 1 ? '1 Month' : `${m} Months`;
+const span = m => m >= 24 && m % 12 === 0 ? `${m / 12} year${m === 12 ? '' : 's'}` : `${m} month${m === 1 ? '' : 's'}`;
+const label = m => m === 0 ? 'All' : span(m).replace(/\b\w/g, c => c.toUpperCase());
 function ago(iso) {
   const t = new Date(iso).getTime(); if (!Number.isFinite(t)) return '—';
   const min = Math.max(0, Math.round((Date.now() - t) / 60000));
@@ -145,17 +153,23 @@ function ago(iso) {
 async function getJson(url) {
   try { const r = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch { return null; }
 }
+// The page first loads one small file with every movie's scores (data/scores.json), so rankings cover the whole
+// time frame at once. The full card details (poster, summary, trailer...) come from the month files, and only for
+// the cards actually shown, so scrolling pulls in a few files at a time instead of every month up front.
 async function loadData(force) {
-  if (force) Object.keys(shards).forEach(k => delete shards[k]);
-  index = await getJson('data/index.json');
-  const from = cutoffDate() ? cutoffDate().toISOString().slice(0, 7) : '';
-  const want = (index ? index.months.map(x => x.m) : []).filter(m => m >= from);
-  const need = want.filter(m => !shards[m]);
-  for (let i = 0; i < need.length; i += 6) {
-    await Promise.all(need.slice(i, i + 6).map(async m => { const d = await getJson(`data/${m}.json`); shards[m] = d ? d.items : []; }));
-  }
-  items = want.flatMap(m => shards[m] || []);
+  if (force) { Object.keys(shards).forEach(k => delete shards[k]); Object.keys(detail).forEach(k => delete detail[k]); }
+  const d = await getJson('data/scores.json');
+  if (d && Array.isArray(d.rows)) {
+    index = d;
+    const c = Object.fromEntries(d.cols.map((k, i) => [k, i]));
+    items = d.rows.map(r => ({ id: r[c.id], release: r[c.release], rt: r[c.rt], imdb: r[c.imdb], box: r[c.box], score: r[c.score], st: r[c.st] }));
+  } else { index = null; items = []; }
   $('lastUpdated').textContent = index ? `Last updated: ${ago(index.updated)}` : 'Last updated: not yet';
+}
+async function loadShard(ym) {
+  const d = await getJson(`data/${ym}.json`);
+  shards[ym] = true;
+  (d ? d.items : []).forEach(m => { detail[m.id] = m; });
 }
 
 // Streaming services: how to match TMDb/JustWatch provider names, the site's favicon domain, and its search URL.
@@ -235,7 +249,8 @@ function cardHtml(m, tabDef) {
         ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
         ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
       </div>
-      <div class="links">
+      <p class="watch-label">Score Links and Trailer</p>
+      <div class="links scores">
         ${icon(rtUrl, fav('rottentomatoes.com'), 'Rotten Tomatoes')}
         ${icon(imdbUrl, fav('imdb.com'), 'IMDb')}
         ${icon(ytUrl, fav('youtube.com'), 'YouTube')}
@@ -247,7 +262,13 @@ function cardHtml(m, tabDef) {
   </article>`;
 }
 
-function render() {
+// Scrolling near the bottom reveals the next batch of cards (their month files are fetched in render).
+function loadMore() {
+  if (more && shown < lastLen) { shown += BATCH; render(); }
+}
+
+async function render() {
+  const gen = ++renderGen;
   const tabDef = TABS.find(t => t.k === tab);
   const cut = cutoffDate() ? cutoffDate().toISOString().slice(0, 10) : '';
   // On Rotten Tomatoes and IMDb boards, break equal-score ties by box office.
@@ -257,31 +278,38 @@ function render() {
     const bHasBox = b.box != null && Number.isFinite(Number(b.box));
     if (aHasBox !== bHasBox) return aHasBox ? -1 : 1;
     if (aHasBox && bHasBox && Number(a.box) !== Number(b.box)) return Number(b.box) - Number(a.box);
-    return a.title.localeCompare(b.title);
+    return a.id - b.id;
   };
   let list = items.filter(m => m.release >= cut && tabDef.f(m) != null)
     .sort((a, b) => {
       const scoreDifference = tabDef.f(b) - tabDef.f(a);
       if (scoreDifference !== 0) return scoreDifference;
       if (tab === 'rt' || tab === 'imdb') return compareBoxOffice(a, b);
-      return a.title.localeCompare(b.title);
+      return a.id - b.id;
     });
   list.forEach((m, i) => { m.rank = i + 1; });
   if (favOnly) list = list.filter(m => favs.has(m.id));
   if (streamOnly) list = list.filter(isStreaming);
   if (sort === 'date') list.sort((a, b) => b.release.localeCompare(a.release) || a.rank - b.rank);
 
-  $('count').textContent = `${list.length} movie${list.length === 1 ? '' : 's'}${months ? ` released in the last ${months} month${months === 1 ? '' : 's'}` : ''} · ranked by ${tabDef.hint.toLowerCase()}`;
+  $('count').textContent = `${list.length} movie${list.length === 1 ? '' : 's'}${months ? ` released in the last ${span(months)}` : ''} · ranked by ${tabDef.hint.toLowerCase()}`;
   const grid = $('grid');
   if (!list.length) {
     grid.innerHTML = `<div class="empty">${!index ? 'No data yet. Run the “Update recent movies” workflow once (Actions tab).' : favOnly ? 'No favorites in this window. Star a movie to pin it here.' : streamOnly ? 'No streaming movies in this window yet. Streaming info is added on each daily update.' : 'No movies match this tab and time frame. Try a longer period or All.'}</div>`;
-    more = false; $('sentinel').style.display = 'none'; return;
+    more = false; lastLen = 0; $('sentinel').style.display = 'none'; return;
   }
   const key = [tab, months, sort, favOnly, streamOnly].join('|');
   if (key !== lastKey) { lastKey = key; shown = BATCH; }
   const slice = list.slice(0, shown);
-  grid.innerHTML = slice.map(m => cardHtml(m, tabDef)).join('');
+  lastLen = list.length;
   more = list.length > slice.length;
+  const need = [...new Set(slice.filter(m => !detail[m.id]).map(m => m.release.slice(0, 7)))].filter(ym => !shards[ym]);
+  if (need.length) {                                   // fetch the month files these cards live in, 6 at a time
+    $('sentinel').textContent = 'Loading…'; $('sentinel').style.display = '';
+    for (let i = 0; i < need.length; i += 6) await Promise.all(need.slice(i, i + 6).map(loadShard));
+    if (gen !== renderGen) return;                     // a newer render replaced this one while files were loading
+  }
+  grid.innerHTML = slice.filter(m => detail[m.id]).map(m => cardHtml({ ...detail[m.id], rank: m.rank }, tabDef)).join('');
   fitMore();
   $('sentinel').textContent = more ? `Showing ${slice.length} of ${list.length} — loading more…` : '';
   $('sentinel').style.display = more ? '' : 'none';
@@ -297,7 +325,9 @@ function fitMore() {
 
 function renderTabs() {
   $('sources').innerHTML = TABS.map(t => `<button class="tab-btn${t.k === tab ? ' active' : ''}" data-tab="${t.k}" title="${esc(t.hint)}">${t.l}</button>`).join('');
-  $('tabs').innerHTML = MONTHS.map(m => `<button class="tab-btn${m === months ? ' active' : ''}" data-months="${m}">${label(m)}</button>`).join('');
+  const btn = m => `<button class="tab-btn${m === months ? ' active' : ''}" data-months="${m}">${label(m)}</button>`;
+  $('tabs').innerHTML = MONTHS.map(btn).join('');
+  $('tabsYears').innerHTML = YEARS.map(btn).join('');
   document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
   $('favBtn').classList.toggle('active', favOnly);
   $('streamBtn').classList.toggle('active', streamOnly);
@@ -308,10 +338,9 @@ function setup() {
     const b = e.target.closest('[data-tab]'); if (!b) return;
     tab = b.dataset.tab; setPref('movies_tab', tab); window.scrollTo(0, 0); renderTabs(); render();
   });
-  $('tabs').addEventListener('click', async e => {
+  $('timeframes').addEventListener('click', e => {
     const b = e.target.closest('[data-months]'); if (!b) return;
-    months = parseInt(b.dataset.months, 10); setPref('movies_months', months); renderTabs();
-    $('count').textContent = 'Loading…'; await loadData(); render();
+    months = parseInt(b.dataset.months, 10); setPref('movies_months', months); renderTabs(); render();
   });
   document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.addEventListener('click', () => {
     sort = b.dataset.sort; setPref('movies_sort', sort); renderTabs(); render();
@@ -340,7 +369,6 @@ function setup() {
     await loadData(true); render(); b.disabled = false; b.textContent = 'Refresh';
   });
   const sentinel = $('sentinel');
-  const loadMore = () => { if (more) { shown += BATCH; render(); } };
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) loadMore(); }, { rootMargin: '600px 0px' });
     io.observe(sentinel);
