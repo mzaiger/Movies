@@ -27,6 +27,7 @@ RECENT_BUDGET = int(os.environ.get("OMDB_RECENT_BUDGET", "300"))  # most the dai
 RECENT_MONTHS = int(os.environ.get("RECENT_MONTHS", "12"))      # how far back the daily job looks
 RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per page (50 = top 1000 by popularity)
 REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
+NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new that is not ranked yet is re-asked every day
 HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
 HIST_FLOOR = int(os.environ.get("HISTORY_FLOOR_YEAR", "1900"))
 TODAY = datetime.now(timezone.utc).date()
@@ -135,6 +136,11 @@ def box_score(v):
     return None if not v or v <= 0 else max(0.0, min(100.0, (math.log10(v) - 5) / 4 * 100))
 
 
+def ranked(m: dict) -> bool:
+    """On the board: it has a box office, or both a Rotten Tomatoes and an IMDb score."""
+    return bool(m.get("box")) or (m.get("rt") is not None and m.get("imdb") is not None)
+
+
 def build(d: dict, old: dict | None, o: dict | None) -> dict:
     it = dict(old or {})
     vids = [v for v in (d.get("videos") or {}).get("results", [])
@@ -226,7 +232,17 @@ def checkpoint(store: Store, o: Omdb):
 
 
 def stale(old) -> bool:
-    return not old or not old.get("omdb_at") or (TODAY - date.fromisoformat(old["omdb_at"])).days >= REFRESH_DAYS
+    if not old or not old.get("omdb_at"):
+        return True
+    asked = date.fromisoformat(old["omdb_at"])
+    if (TODAY - asked).days >= REFRESH_DAYS:
+        return True
+    # a brand-new movie that is not on the board yet: ask again every day (once a day) until it is
+    rel = old.get("release") or ""
+    if asked < TODAY and not ranked(old) and len(rel) == 10:
+        age = (TODAY - date.fromisoformat(rel)).days
+        return 0 <= age <= NEW_DAYS
+    return False
 
 
 def refresh(mid, store: Store, o: Omdb, hp=None):
@@ -243,8 +259,11 @@ def refresh(mid, store: Store, o: Omdb, hp=None):
 # ---------- jobs ----------
 def run_recent():
     start = add_months(TODAY.strftime("%Y-%m"), -RECENT_MONTHS) + "-01"
-    ids = list(discover(**{"primary_release_date.gte": start, "primary_release_date.lte": TODAY.isoformat(),
-                           "with_release_type": "2|3", "sort_by": "popularity.desc"}))[: RECENT_PAGES * 20]
+    q = {"primary_release_date.lte": TODAY.isoformat(), "with_release_type": "2|3", "sort_by": "popularity.desc"}
+    new_start = (TODAY - timedelta(days=NEW_DAYS)).isoformat()
+    newest = list(discover(**q, **{"primary_release_date.gte": new_start}))      # new theatrical releases go first,
+    rest = list(discover(**q, **{"primary_release_date.gte": start}))[: RECENT_PAGES * 20]   # so they get OMDb first
+    ids = newest + [i for i in rest if i not in set(newest)]
     store, o = Store(), Omdb(min(RECENT_BUDGET, budget_left()))
     print(f"{len(ids)} movies since {start}; OMDb budget {o.left}")
     try:
