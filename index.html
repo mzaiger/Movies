@@ -96,7 +96,7 @@
     <div class="updated-row"><span id="lastUpdated">Last updated: —</span><button class="refresh-btn" id="refreshBtn" type="button">Refresh</button></div>
   </div>
   <h1>Movie Board</h1>
-  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have at least 2 of the 3. Pick a tab to rank by one score, filter by release date (1 to 12 months, or 2, 5, 10, 20 years), and star a movie to keep it handy. Under “Score Links and Trailer”, use the icons to open Rotten Tomatoes, IMDb or the YouTube trailer.</p>
+  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have a box office, or both a Rotten Tomatoes score and an IMDb rating. Pick a tab to rank by one score, filter by release date (1 to 12 months, or 2, 5, 10, 20 years), and star a movie to keep it handy. Under “Score Links and Trailer”, use the icons to open Rotten Tomatoes, IMDb or the YouTube trailer.</p>
 </header>
 <main>
   <div class="controls">
@@ -124,11 +124,13 @@
   <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Streaming availability is TMDb data provided by <a href="https://www.justwatch.com/">JustWatch</a> (US). Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
 </main>
 <script>
-const MIN_SCORES = 2;   // a movie needs at least this many of its 3 scores to be ranked on the All tab
+// a movie is ranked on the All tab if it has a box office, or both a Rotten Tomatoes score and an IMDb rating
+const hasNum = v => v != null && Number.isFinite(Number(v));
+const isRanked = m => hasNum(m.box) || (hasNum(m.rt) && hasNum(m.imdb));
 // Derive the count from the actual score fields, not the stored n value (which may be stale in older JSON).
 const scoreCount = m => [m.rt, m.imdb, m.box].filter(v => v != null && Number.isFinite(Number(v))).length;
 const TABS = [
-  { k: 'all',  l: 'All',             hint: `Average of the scores a movie has, weighted evenly (needs ${MIN_SCORES} of 3)`, f: m => scoreCount(m) >= MIN_SCORES ? m.score : null },
+  { k: 'all',  l: 'All',             hint: 'Average of the scores a movie has, weighted evenly (needs a box office, or both Rotten Tomatoes and IMDb)', f: m => isRanked(m) ? m.score : null },
   { k: 'rt',   l: 'Rotten Tomatoes', hint: 'Rotten Tomatoes critic score',                    f: m => m.rt },
   { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
   { k: 'box',  l: 'Box Office',      hint: 'Box office gross',                                f: m => m.box },
