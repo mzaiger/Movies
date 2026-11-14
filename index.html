@@ -23,6 +23,7 @@
   .refresh-btn:hover { border-color:var(--blue); }
   .refresh-btn:disabled { opacity:.5; cursor:default; }
   .sort-btn.active { border-color:var(--blue); color:var(--blue); }
+  .foot-ico { width:14px; height:14px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
   h1 { font-family:'Oswald',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.02em; font-size:clamp(26px,4vw,38px); line-height:1; margin:0 0 6px; }
   .sub { color:var(--text-dim); font-size:13px; margin:0; max-width:900px; line-height:1.5; }
   main { max-width:1700px; margin:0 auto; padding:0 24px 60px; }
@@ -121,7 +122,7 @@
   <p class="count" id="count"></p>
   <div class="grid" id="grid"></div>
   <div id="sentinel" class="sentinel"></div>
-  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/">OMDb</a>; Streaming availability is TMDb data provided by <a href="https://www.justwatch.com/">JustWatch</a> (US). Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
+  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/"><img class="foot-ico" src="https://www.google.com/s2/favicons?domain=omdbapi.com&sz=64" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">OMDb</a>; Streaming availability is TMDb data provided by <a href="https://www.justwatch.com/"><img class="foot-ico" src="https://www.google.com/s2/favicons?domain=justwatch.com&sz=64" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">JustWatch</a> (US). Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
 </main>
 <script>
 // a movie is ranked on the All tab if it has a box office, or both a Rotten Tomatoes score and an IMDb rating
