@@ -29,7 +29,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 
 ## The page
 
-* **Tabs:** All, Rotten Tomatoes, IMDb, Box Office. Audience score is excluded. Each single-score tab ranks movies by that score. All averages the available Rotten Tomatoes, IMDb and Box Office scores with equal weight; a movie appears on All if it has both Rotten Tomatoes and IMDb scores, or a box office of $100K or more (`MIN_BOX` in `index.html` and `movies.py`). A movie missing Rotten Tomatoes or IMDb therefore needs $100K+ at the box office to be listed. The **Box Office** tab also hides any movie under $100K.
+* **Tabs:** All, Rotten Tomatoes, IMDb, Box Office. Audience score is excluded. Each single-score tab ranks movies by that score. All averages the available Rotten Tomatoes, IMDb and Box Office scores with equal weight; a movie appears on All if it has both Rotten Tomatoes and IMDb scores, or a counted box office (`MIN_BOX` $1M and `SURE_BOX` $2M in `index.html` and `movies.py`): $2M or more, or $1M or more when the movie also has a Rotten Tomatoes or IMDb score. A movie missing Rotten Tomatoes or IMDb with under $2M and no score is not listed. The **Box Office** tab uses the same counted box office.
 * **Time frame:** two rows based on release date. Top row: 1, 2, 3, 6, 12 months. Row under it: 2, 5, 10, 20 years and All.
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
@@ -48,6 +48,16 @@ All three scores are put on a 0 to 100 scale and averaged evenly. If a movie is 
 | Rotten Tomatoes | OMDb `Ratings` (critic Tomatometer) | Percent as is |
 | IMDb | OMDb `imdbRating` | Rating x 10 |
 | Box Office | OMDb `BoxOffice` (domestic); TMDb `revenue` (worldwide) if OMDb has none | Log scale: $100K = 0, $1B = 100 |
+
+## Keeping fake and junk movies out
+
+TMDb is community-edited, so people can add fake movies with invented revenue. A movie only counts if it is **in both APIs**: TMDb has it, it has an IMDb id, and OMDb recognised that id (`omdb_at` is set). A real movie OMDb knows but has no ratings for yet still counts as in both. Box office is ignored for anything not in both.
+
+Movies that fail the board rules and are older than `KEEP_DAYS` (60) are removed from the month files and their TMDb id goes in `state/skipped.json`, so they are never fetched again (delete an id from that file to re-check it). Younger movies are kept, since ratings and box office may still arrive.
+
+* `python movies.py clean` re-applies the rules to the saved data (no API calls or keys): drops failing movies, removes duplicate copies of one TMDb id, re-scores.
+* `python movies.py report` lists the past two months on the board with IMDb vote counts, to pick `MIN_VOTES`. Votes are stored from the next OMDb refresh of each movie (within `REFRESH_DAYS`).
+* `MIN_VOTES` (default 0 = off) drops movies older than `KEEP_DAYS` with fewer IMDb votes; `VOTES_GRACE_DAYS` (14) exempts brand-new movies.
 
 ## How the data is built
 

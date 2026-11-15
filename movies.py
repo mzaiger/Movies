@@ -21,6 +21,7 @@ import requests
 TMDB_KEY = os.environ.get("TMDB_Key", "").strip()      # GitHub secret TMDB_Key
 OMDB_KEY = os.environ.get("OMDB_Key", "").strip()      # GitHub secret OMDB_Key
 DATA, STATE = Path("data"), Path("state")
+SKIP_FILE = STATE / "skipped.json"                                # TMDb ids that failed the board rules and are old enough to leave alone
 OMDB_LIMIT = int(os.environ.get("OMDB_DAILY_LIMIT", "1000"))
 OMDB_MARGIN = int(os.environ.get("OMDB_MARGIN", "50"))          # requests never spent
 RECENT_BUDGET = int(os.environ.get("OMDB_RECENT_BUDGET", "300"))  # most the daily job may spend
@@ -29,7 +30,11 @@ RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per 
 REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
 NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new that is not ranked yet is re-asked every day
 HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
-MIN_BOX = 100_000      # box office below this does not count (Box Office tab, and ranking movies that lack RT or IMDb)
+MIN_BOX = 1_000_000    # box office below this never counts
+SURE_BOX = 2_000_000   # from MIN_BOX up to this, box office only counts if the movie also has an RT or IMDb score (TMDb revenue is community-edited)
+MIN_VOTES = int(os.environ.get("MIN_VOTES", "0"))               # IMDb votes needed to stay on the board (0 = off); see `python movies.py report`
+KEEP_DAYS = int(os.environ.get("KEEP_DAYS", "60"))              # a movie younger than this is never dropped: ratings and box office may still arrive
+VOTES_GRACE_DAYS = int(os.environ.get("VOTES_GRACE_DAYS", "14"))  # a movie this new is exempt from MIN_VOTES
 HIST_FLOOR = int(os.environ.get("HISTORY_FLOOR_YEAR", "1900"))
 TODAY = datetime.now(timezone.utc).date()
 
@@ -137,9 +142,14 @@ def box_score(v):
     return None if not v or v <= 0 else max(0.0, min(100.0, (math.log10(v) - 5) / 4 * 100))
 
 
+def has_box(m: dict) -> bool:
+    box = m.get("box") or 0
+    return box >= SURE_BOX or (box >= MIN_BOX and (m.get("rt") is not None or m.get("imdb") is not None))
+
+
 def ranked(m: dict) -> bool:
-    """On the board: it has a box office of $100K or more, or both a Rotten Tomatoes and an IMDb score."""
-    return (m.get("box") or 0) >= MIN_BOX or (m.get("rt") is not None and m.get("imdb") is not None)
+    """On the board: a counted box office ($2M or more, or $1M or more with an RT or IMDb score), or both RT and IMDb."""
+    return has_box(m) or (m.get("rt") is not None and m.get("imdb") is not None)
 
 
 def build(d: dict, old: dict | None, o: dict | None) -> dict:
@@ -154,7 +164,7 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         overview=d.get("overview") or "", imdb_id=d.get("imdb_id") or "",
         poster=("https://image.tmdb.org/t/p/w342" + pp) if pp else it.get("poster", ""),
         trailer=("https://www.youtube.com/watch?v=" + vids[0]["key"]) if vids else "",
-        tmdb_revenue=d.get("revenue") or 0)
+        tmdb_revenue=d.get("revenue") or 0, tmdb_votes=d.get("vote_count") or 0)
     if "watch/providers" in d:      # US streaming (JustWatch data via TMDb); keep old values if TMDb didn't answer
         prov = ((d.get("watch/providers") or {}).get("results") or {}).get("US") or {}
         names = lambda k: [x["provider_name"] for x in prov.get(k, []) if x.get("provider_name")]
@@ -168,19 +178,57 @@ def build(d: dict, old: dict | None, o: dict | None) -> dict:
         it["theatrical"] = theatrical[0] if theatrical else ""
     if o:
         rt = next((num(r.get("Value")) for r in o.get("Ratings", []) if r.get("Source") == "Rotten Tomatoes"), None)
-        it.update(rt=rt, imdb=num(o.get("imdbRating")), omdb_box=num(o.get("BoxOffice")), omdb_at=TODAY.isoformat())
+        it.update(rt=rt, imdb=num(o.get("imdbRating")), omdb_box=num(o.get("BoxOffice")), votes=num(o.get("imdbVotes")), omdb_at=TODAY.isoformat())
         if not it["poster"] and o.get("Poster", "N/A") != "N/A":
             it["poster"] = o["Poster"]
-    for k in ("rt", "imdb", "omdb_box", "omdb_at"):
+    for k in ("rt", "imdb", "omdb_box", "votes", "omdb_at"):
         it.setdefault(k, None)
-    box = it["omdb_box"] or it["tmdb_revenue"] or None      # domestic (OMDb) first, worldwide (TMDb) if missing
-    it["box"], it["bo_src"] = box, ("omdb" if it["omdb_box"] else "tmdb" if box else "")
+    return rescore(it)
+
+
+def verified(it: dict) -> bool:
+    """In both APIs: TMDb has it (we are holding it) and OMDb recognised its IMDb id (omdb_at is only set when OMDb
+    answered). TMDb is community-edited, so a fake entry can carry invented revenue; it has no IMDb page, so OMDb never
+    answers and it never counts. A real movie OMDb knows but has no ratings for yet is still verified."""
+    return bool(it.get("imdb_id")) and bool(it.get("omdb_at"))
+
+
+def rescore(it: dict) -> dict:
+    ok = verified(it)
+    box = (it.get("omdb_box") or it.get("tmdb_revenue") or None) if ok else None   # domestic (OMDb) first, worldwide (TMDb) if missing
+    it["box"], it["bo_src"] = box, ("omdb" if ok and it.get("omdb_box") else "tmdb" if box else "")
     it.pop("aud", None); it.pop("tmdb_user", None)   # audience score was removed; drop it from older saved items
-    parts = [it["rt"], it["imdb"] * 10 if it["imdb"] is not None else None, box_score(box)]
+    parts = [it.get("rt"), it["imdb"] * 10 if it.get("imdb") is not None else None, box_score(box)]
     parts = [p for p in parts if p is not None]
     it["score"] = round(sum(parts) / len(parts), 1) if parts else None   # all available scores, weighted evenly
     it["n"] = len(parts)
     return it
+
+
+def age_days(it: dict) -> int:
+    rel = it.get("release") or ""
+    return (TODAY - date.fromisoformat(rel)).days if len(rel) == 10 else 0
+
+
+def asked_no(it: dict) -> bool:
+    """OMDb was really asked about this movie and gave no answer (not merely out of requests that day).
+    History-job movies are only saved after OMDb was asked, so hp counts too."""
+    return bool(it.get("omdb_no")) or it.get("hp") is not None
+
+
+def droppable(it: dict) -> bool:
+    """True if the movie fails the board rules AND is old enough that it will not change. Younger movies are kept."""
+    if age_days(it) < KEEP_DAYS:
+        return False
+    if not it.get("imdb_id"):                      # TMDb-only: no IMDb page at all
+        return True
+    if not it.get("omdb_at"):                      # IMDb id, but OMDb never recognised it
+        return asked_no(it)
+    if not ranked(it):                             # in both, but too little box office and missing RT or IMDb
+        return True
+    return bool(MIN_VOTES) and it.get("votes") is not None and it["votes"] < MIN_VOTES and age_days(it) >= VOTES_GRACE_DAYS
+
+
 
 
 # ---------- storage: one file per release month ----------
@@ -195,6 +243,7 @@ def score_row(m: dict) -> list:
 class Store:
     def __init__(self):
         self.s, self.dirty, self.rows = {}, set(), {}
+        self.skip = set(read(SKIP_FILE, []))
 
     def month(self, ym):
         if ym not in self.s:
@@ -202,7 +251,11 @@ class Store:
         return self.s[ym]
 
     def put(self, it):
-        self.month(it["release"][:7])[str(it["id"])] = it
+        if droppable(it):                          # not worth keeping: remember the id so it is not fetched again
+            self.skip.add(it["id"])
+            self.month(it["release"][:7]).pop(str(it["id"]), None)
+        else:
+            self.month(it["release"][:7])[str(it["id"])] = it
         self.dirty.add(it["release"][:7])
 
     def _rows(self, ym):
@@ -217,6 +270,7 @@ class Store:
             write(DATA / f"{ym}.json", {"month": ym, "updated": stamp, "items": items})
             self.rows[ym] = self._rows(ym)
         self.dirty.clear()
+        write(SKIP_FILE, sorted(self.skip))
         for p in DATA.glob("????-??.json"):
             if p.stem not in self.rows:
                 self.rows[p.stem] = self._rows(p.stem)
@@ -247,11 +301,19 @@ def stale(old) -> bool:
 
 
 def refresh(mid, store: Store, o: Omdb, hp=None):
+    if mid in store.skip:
+        return
     d = tmdb(f"/movie/{mid}", append_to_response="videos,watch/providers,release_dates", language="en-US")
     if not d.get("id") or len(d.get("release_date") or "") < 10:
         return
     old = store.month(d["release_date"][:7]).get(str(mid))
-    it = build(d, old, o.get(d.get("imdb_id")) if stale(old) else None)
+    need = stale(old) and bool(d.get("imdb_id")) and not o.exhausted()
+    od = o.get(d.get("imdb_id")) if stale(old) else None
+    it = build(d, old, od)
+    if need and not od and not o.blocked:         # OMDb was asked and had nothing: remember that
+        it["omdb_no"] = TODAY.isoformat()
+    elif od:
+        it.pop("omdb_no", None)
     if hp is not None:
         it["hp"] = hp                       # which history pass last checked this movie
     store.put(it)
@@ -297,7 +359,7 @@ def run_history():
                                    "vote_count.gte": HIST_MIN_VOTES, "sort_by": "vote_count.desc"}))
             have = store.month(cur)
             # Do a movie if it is new, or if an earlier pass did it (items saved before passes existed count as pass 1).
-            todo = [i for i in ids if str(i) not in have or have[str(i)].get("hp", 1) != pas]
+            todo = [i for i in ids if i not in store.skip and (str(i) not in have or have[str(i)].get("hp", 1) != pas)]
             finished = True
             for mid in todo:
                 if stale(have.get(str(mid))) and o.exhausted():     # only stop when this movie would need OMDb
@@ -322,6 +384,48 @@ def run_history():
         print(f"Stopped at {cur}; OMDb allowance used for today.")
 
 
+def run_clean():
+    """Re-apply the board rules to every saved movie, drop the ones that fail (and are old enough), and remove duplicate
+    copies of one TMDb id (left behind when TMDb moves a release date into another month). No API calls, no keys."""
+    store = Store()
+    first, dropped, dupes, rescored = {}, 0, 0, 0
+    for p in sorted(DATA.glob("????-??.json")):
+        for it in list(store.month(p.stem).values()):
+            prev = first.get(it["id"])
+            if prev:                                   # keep the copy OMDb was asked about most recently
+                a, b = prev, (p.stem, it)
+                lose, win = (b, a) if (a[1].get("omdb_at") or "") >= (b[1].get("omdb_at") or "") else (a, b)
+                store.s[lose[0]].pop(str(lose[1]["id"]), None); store.dirty.add(lose[0])
+                first[it["id"]] = win
+                dupes += 1
+            else:
+                first[it["id"]] = (p.stem, it)
+    for ym in list(store.s):
+        for k, it in list(store.s[ym].items()):
+            before = (it.get("box"), it.get("score"))
+            rescore(it)
+            if droppable(it):
+                store.skip.add(it["id"]); del store.s[ym][k]; dropped += 1; store.dirty.add(ym)
+            elif before != (it.get("box"), it.get("score")):
+                rescored += 1; store.dirty.add(ym)
+    store.save()
+    print(f"Dropped {dropped} movies, removed {dupes} duplicate copies, re-scored {rescored}. Skip list: {len(store.skip)} ids.")
+
+
+def run_report():
+    """Past 2 months on the board, with their IMDb vote counts, to help pick MIN_VOTES. No API calls."""
+    start = (TODAY - timedelta(days=61)).isoformat()
+    rows = []
+    for p in sorted(DATA.glob("????-??.json"))[-4:]:
+        for it in read(p, {}).get("items", []):
+            if it.get("release", "") >= start and verified(it) and ranked(it):
+                rows.append(it)
+    have = sorted((it for it in rows if it.get("votes") is not None), key=lambda it: it["votes"])
+    print(f"{len(rows)} movies on the board since {start}; {len(have)} have an IMDb vote count so far.")
+    for it in have[:25]:
+        print(f"{int(it['votes']):>8,}  {it['release']}  {it['title'][:50]}")
+
+
 def run_index():
     """Rebuild data/index.json and data/scores.json from the month files. No API calls, no keys needed."""
     Store().save()
@@ -331,6 +435,10 @@ def run_index():
 if __name__ == "__main__":
     if sys.argv[1:] == ["index"]:
         run_index(); sys.exit(0)
+    if sys.argv[1:] == ["clean"]:
+        run_clean(); sys.exit(0)
+    if sys.argv[1:] == ["report"]:
+        run_report(); sys.exit(0)
     if not TMDB_KEY:
         sys.exit("TMDB_Key is not set.")
     if not OMDB_KEY:
