@@ -29,6 +29,7 @@ RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per 
 REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
 NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new that is not ranked yet is re-asked every day
 HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
+MIN_BOX = 100_000      # box office below this does not count (Box Office tab, and ranking movies that lack RT or IMDb)
 HIST_FLOOR = int(os.environ.get("HISTORY_FLOOR_YEAR", "1900"))
 TODAY = datetime.now(timezone.utc).date()
 
@@ -137,8 +138,8 @@ def box_score(v):
 
 
 def ranked(m: dict) -> bool:
-    """On the board: it has a box office, or both a Rotten Tomatoes and an IMDb score."""
-    return bool(m.get("box")) or (m.get("rt") is not None and m.get("imdb") is not None)
+    """On the board: it has a box office of $100K or more, or both a Rotten Tomatoes and an IMDb score."""
+    return (m.get("box") or 0) >= MIN_BOX or (m.get("rt") is not None and m.get("imdb") is not None)
 
 
 def build(d: dict, old: dict | None, o: dict | None) -> dict:
