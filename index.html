@@ -127,7 +127,7 @@
 <script>
 // Box office counts only at $100K or more (MIN_BOX). A movie is ranked on the All tab if it has a counted box office,
 // or both a Rotten Tomatoes score and an IMDb rating. A movie missing either score needs a box office of $100K+.
-const MIN_BOX = 100000;
+const MIN_BOX = 1000000;
 const hasNum = v => v != null && Number.isFinite(Number(v));
 const hasBox = m => hasNum(m.box) && Number(m.box) >= MIN_BOX;
 const isRanked = m => hasBox(m) || (hasNum(m.rt) && hasNum(m.imdb));
