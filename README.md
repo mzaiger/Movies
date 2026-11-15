@@ -29,7 +29,7 @@ Add both under **Settings > Secrets and variables > Actions**. `TMDB_Key` can be
 
 ## The page
 
-* **Tabs:** All, Rotten Tomatoes, IMDb, Box Office. Audience score is excluded. Each single-score tab ranks movies by that score. All averages the available Rotten Tomatoes, IMDb and Box Office scores with equal weight; a movie needs only 2 of those 3 scores to appear and rank (`MIN_SCORES = 2` in `index.html`).
+* **Tabs:** All, Rotten Tomatoes, IMDb, Box Office. Audience score is excluded. Each single-score tab ranks movies by that score. All averages the available Rotten Tomatoes, IMDb and Box Office scores with equal weight; a movie appears on All if it has both Rotten Tomatoes and IMDb scores, or a box office of $100K or more (`MIN_BOX` in `index.html` and `movies.py`). A movie missing Rotten Tomatoes or IMDb therefore needs $100K+ at the box office to be listed. The **Box Office** tab also hides any movie under $100K.
 * **Time frame:** two rows based on release date. Top row: 1, 2, 3, 6, 12 months. Row under it: 2, 5, 10, 20 years and All.
 * **Sort:** Ranking or Newest. **★ Favorites** shows only starred movies (stored in your browser).
 * **Poster:** the TMDb poster URL (OMDb's poster if TMDb has none).
