@@ -1,424 +1,454 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=0.8">
-<title>Movie Board</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AC%3C/text%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  :root { --bg:#FFFFFF; --panel:#F2F7FD; --line:#D9E5F2; --text:#10233F; --text-dim:#64798E; --blue:#1B63E0; --warm:#F2A93B; --radius:10px; }
-  * { box-sizing: border-box; }
-  html, body { margin:0; padding:0; background:var(--bg); color:var(--text); font-family:'Inter',system-ui,sans-serif; -webkit-font-smoothing:antialiased; }
-  body { min-height:100vh; background-image: radial-gradient(circle at 12% 0%, rgba(27,99,224,0.07), transparent 45%), radial-gradient(circle at 88% 6%, rgba(27,99,224,0.05), transparent 40%); }
-  header { padding:22px 24px 4px; max-width:1700px; margin:0 auto; }
-  .eyebrow-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:12px; margin-bottom:6px; }
-  .eyebrow { font-family:'IBM Plex Mono',monospace; font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--blue); margin:0; }
-  .updated-row { display:flex; align-items:center; gap:10px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
-  button { font-family:inherit; cursor:pointer; }
-  .refresh-btn, .sort-btn { background:var(--panel); border:1px solid var(--line); color:var(--text-dim); border-radius:6px; padding:6px 11px; font-family:'IBM Plex Mono',monospace; font-size:12px; }
-  .refresh-btn { color:var(--blue); }
-  .refresh-btn:hover { border-color:var(--blue); }
-  .refresh-btn:disabled { opacity:.5; cursor:default; }
-  .sort-btn.active { border-color:var(--blue); color:var(--blue); }
-  .foot-ico { width:14px; height:14px; border-radius:3px; vertical-align:-2px; margin-right:4px; }
-  h1 { font-family:'Oswald',sans-serif; font-weight:700; text-transform:uppercase; letter-spacing:.02em; font-size:clamp(26px,4vw,38px); line-height:1; margin:0 0 6px; }
-  .sub { color:var(--text-dim); font-size:13px; margin:0; max-width:900px; line-height:1.5; }
-  main { max-width:1700px; margin:0 auto; padding:0 24px 60px; }
-  .controls { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px 16px; margin:4px 0 14px; position:sticky; top:0; padding:10px 0; background:linear-gradient(var(--bg) 78%, transparent); z-index:10; }
-  .tabs { display:flex; flex-wrap:wrap; gap:4px; background:var(--panel); border:1px solid var(--line); border-radius:999px; padding:3px; }
-  .tab-btn { font-family:'Oswald',sans-serif; font-weight:600; letter-spacing:.04em; text-transform:uppercase; font-size:12.5px; color:var(--text-dim); background:transparent; border:none; border-radius:999px; padding:7px 14px; }
-  .tab-btn:hover { color:var(--text); }
-  .tab-btn.active { background:var(--blue); color:#fff; }
-  .timeframes { display:flex; flex-direction:column; align-items:stretch; gap:6px; max-width:100%; }
-  .timeframes .tabs { display:grid; grid-template-columns:repeat(5,auto); }
-  .timeframes .tab-btn { text-align:center; white-space:nowrap; }
-  @media (max-width:520px) { .timeframes { width:100%; } .timeframes .tabs { grid-template-columns:repeat(5,minmax(0,1fr)); } .timeframes .tab-btn { padding:7px 2px; font-size:11.5px; } }
-  .tabs.sources .tab-btn { font-size:14px; padding:8px 18px; }
-  .sortbox { display:flex; flex-direction:column; align-items:flex-start; gap:6px; max-width:100%; }
-  .sort span { min-width:38px; }
-  .sort { display:flex; flex-wrap:wrap; max-width:100%; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
-  .count { font-family:'IBM Plex Mono',monospace; color:var(--text-dim); font-size:12px; margin:0 0 12px; }
-  .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(230px,1fr)); gap:14px; }
-  .card { position:relative; display:flex; flex-direction:column; background:#fff; border:1px solid var(--line); border-radius:var(--radius); overflow:hidden; box-shadow:0 1px 2px rgba(16,35,63,.04); }
-  .thumb-wrap { position:relative; aspect-ratio:2/3; background:var(--panel); overflow:hidden; }
-  .thumb-wrap img { width:100%; height:100%; object-fit:cover; display:block; }
-  .thumb-fallback { width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-family:'Oswald',sans-serif; font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--text-dim); }
-  .stream-pill { position:absolute; left:8px; bottom:8px; z-index:2; border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:12px; font-weight:600; background:#1E9E5A; color:#fff; }
-  .stream-pill.rent { background:rgba(255,255,255,.93); color:var(--text-dim); border:1px solid var(--line); }
-  .rank-pill { position:absolute; top:8px; right:8px; z-index:2; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; padding:3px 10px; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:500; }
-  .dates { font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--text-dim); margin:8px 0 0; line-height:1.55; }
-  .dates b { font-weight:600; color:var(--text); }
-  .watch-label { font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600; color:#1E7A4D; margin:10px 0 0; }
-  .links.watch, .links.scores { margin-top:6px; }
-  .fav-toggle { position:absolute; top:8px; left:8px; z-index:3; width:38px; height:38px; display:flex; align-items:center; justify-content:center; background:rgba(255,255,255,.93); border:1px solid var(--line); border-radius:999px; cursor:pointer; }
-  .fav-toggle input { position:absolute; inset:0; opacity:0; margin:0; cursor:pointer; }
-  .fav-star { font-size:20px; line-height:1; color:var(--text-dim); pointer-events:none; transition:color .15s ease, transform .15s ease; }
-  .fav-toggle input:checked ~ .fav-star { color:var(--warm); transform:scale(1.1); }
-  .fav-toggle input:focus-visible ~ .fav-star { outline:2px solid var(--blue); border-radius:4px; }
-  .body { padding:12px 14px 13px; display:flex; flex-direction:column; flex:1; }
-  .title { font-size:15.5px; line-height:1.3; font-weight:600; margin:0 0 6px; }
-  .desc { font-size:12px; line-height:1.4; color:#3B5169; margin:0 0 10px; overflow-wrap:anywhere; }
-  .desc.none { font-style:italic; opacity:.8; }
-  .desc.clamp { display:-webkit-box; -webkit-line-clamp:5; -webkit-box-orient:vertical; overflow:hidden; margin-bottom:4px; }
-  .more { align-self:flex-start; position:relative; z-index:2; background:none; border:none; padding:0; margin:0 0 8px; color:var(--blue); font-family:'IBM Plex Mono',monospace; font-size:11.5px; }
-  .more:hover { text-decoration:underline; }
-  .more[hidden] { display:none; }
-  .chips { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:100%; margin:auto 0 0; }
-  .chip { background:var(--panel); border:1px solid var(--line); border-radius:7px; padding:8px 2px; min-width:0; width:100%; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; }
-  .chip small { display:block; font-size:11px; font-weight:500; color:var(--text-dim); letter-spacing:.06em; text-transform:uppercase; margin-bottom:2px; }
-  .meta { display:flex; justify-content:space-between; align-items:center; gap:8px; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--text-dim); }
-  .links { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px; width:100%; margin-top:10px; }
-  .links a { display:flex; align-items:center; justify-content:center; gap:6px; min-width:0; height:46px; background:var(--panel); border:1px solid var(--line); border-radius:8px; color:var(--blue); text-decoration:none; font-family:'IBM Plex Mono',monospace; font-size:15px; font-weight:600; transition:border-color .15s ease, background .15s ease; }
-  .links a:hover { border-color:var(--blue); background:#fff; }
-  .links a:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
-  .links img { width:28px; height:28px; display:block; flex:none; }
-  .links img.logo { width:auto; height:auto; max-width:calc(100% - 24px); max-height:32px; object-fit:contain; border-radius:4px; }
-  .links .arrow { font-size:17px; line-height:1; }
-  .empty { text-align:center; padding:70px 20px; color:var(--text-dim); font-family:'IBM Plex Mono',monospace; font-size:13px; grid-column:1/-1; }
-  .sentinel { text-align:center; color:var(--text-dim); font-size:12px; padding:18px 0 30px; }
-  .foot { margin-top:28px; padding-top:14px; border-top:1px solid var(--line); font-size:12px; line-height:1.6; color:var(--text-dim); }
-  @media (max-width:700px) { header, main { padding-left:14px; padding-right:14px; } .grid { grid-template-columns:repeat(auto-fill,minmax(160px,1fr)); gap:10px; } }
-  @media (max-width:700px) {
-    .sortbox { flex-direction:row; flex-wrap:nowrap; align-items:center; justify-content:space-between; gap:6px; width:100%; }
-    .sort { flex-wrap:nowrap; gap:4px; font-size:11.5px; }
-    .sort span { min-width:0; }
-    .sort-btn { padding:6px 7px; font-size:11.5px; white-space:nowrap; }
-  }
-  @media (prefers-reduced-motion:reduce) { .fav-star, .links a { transition:none; } }
-</style>
-</head>
-<body>
-<header>
-  <div class="eyebrow-row">
-    <p class="eyebrow">Movie Board · Rotten Tomatoes · IMDb · Box Office</p>
-    <div class="updated-row"><span id="lastUpdated">Last updated: —</span><button class="refresh-btn" id="refreshBtn" type="button">Refresh</button></div>
-  </div>
-  <h1>Movie Board</h1>
-  <p class="sub">Movies from TMDb with scores from OMDb. The All tab averages the Rotten Tomatoes critic score, the IMDb rating and the box office with equal weight, and only ranks movies that have a box office of $2M or more (or $1M or more when it also has a Rotten Tomatoes or IMDb score), or both a Rotten Tomatoes score and an IMDb rating. Pick a tab to rank by one score, filter by release date (1 to 12 months, or 2, 5, 10, 20 years), and star a movie to keep it handy. Under “Score Links and Trailer”, use the icons to open Rotten Tomatoes, IMDb or the YouTube trailer.</p>
-</header>
-<main>
-  <div class="controls">
-    <div class="tabs sources" id="sources"></div>
-    <div class="timeframes" id="timeframes">
-      <div class="tabs" id="tabs"></div>
-      <div class="tabs" id="tabsYears"></div>
-    </div>
-    <div class="sortbox">
-      <div class="sort">
-        <span>Sort</span>
-        <button class="sort-btn" data-sort="rank">Ranking</button>
-        <button class="sort-btn" data-sort="date">Newest</button>
-      </div>
-      <div class="sort">
-        <span>Filter</span>
-        <button class="sort-btn" id="favBtn" type="button">★ Favorites</button>
-        <button class="sort-btn" id="streamBtn" type="button" title="Only movies streaming in the US (subscription or free with ads)">▶ Streaming</button>
-      </div>
-    </div>
-  </div>
-  <p class="count" id="count"></p>
-  <div class="grid" id="grid"></div>
-  <div id="sentinel" class="sentinel"></div>
-  <p class="foot">This product uses the TMDB API but is not endorsed or certified by TMDB. Ratings data from <a href="https://www.omdbapi.com/"><img class="foot-ico" src="https://www.google.com/s2/favicons?domain=omdbapi.com&sz=64" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">OMDb</a>; Streaming availability is TMDb data provided by <a href="https://www.justwatch.com/"><img class="foot-ico" src="https://www.google.com/s2/favicons?domain=justwatch.com&sz=64" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none'">JustWatch</a> (US). Rotten Tomatoes and IMDb are not affiliated with this site. Box office is OMDb&rsquo;s domestic gross, or TMDb&rsquo;s worldwide revenue when OMDb has none, and is scaled from $100K (0) to $1B (100).</p>
-</main>
-<script>
-// Box office counts at $2M or more (SURE_BOX), or at $1M or more (MIN_BOX) when the movie also has a Rotten Tomatoes or IMDb score.
-// A movie is ranked on the All tab if it has a counted box office, or both a Rotten Tomatoes score and an IMDb rating.
-const MIN_BOX = 1000000, SURE_BOX = 2000000;
-const hasNum = v => v != null && Number.isFinite(Number(v));
-const hasBox = m => hasNum(m.box) && (Number(m.box) >= SURE_BOX || (Number(m.box) >= MIN_BOX && (hasNum(m.rt) || hasNum(m.imdb))));
-const isRanked = m => hasBox(m) || (hasNum(m.rt) && hasNum(m.imdb));
-// Derive the count from the actual score fields, not the stored n value (which may be stale in older JSON).
-const scoreCount = m => [m.rt, m.imdb, m.box].filter(v => v != null && Number.isFinite(Number(v))).length;
-const TABS = [
-  { k: 'all',  l: 'All',             hint: 'Average of the scores a movie has, weighted evenly (needs a box office of $2M or more, $1M or more with a Rotten Tomatoes or IMDb score, or both Rotten Tomatoes and IMDb)', f: m => isRanked(m) ? m.score : null },
-  { k: 'rt',   l: 'Rotten Tomatoes', hint: 'Rotten Tomatoes critic score',                    f: m => m.rt },
-  { k: 'imdb', l: 'IMDb',            hint: 'IMDb rating',                                     f: m => m.imdb == null ? null : m.imdb * 10 },
-  { k: 'box',  l: 'Box Office',      hint: 'Box office gross ($2M or more, or $1M or more with an RT or IMDb score)',                  f: m => hasBox(m) ? m.box : null },
-];
-const MONTHS = [1, 2, 3, 6, 12];            // first row
-const YEARS = [24, 60, 120, 240, 0];        // second row, in months: 2, 5, 10, 20 years, All
-const FRAMES = [...MONTHS, ...YEARS];
-const BATCH = 30;
-const $ = id => document.getElementById(id);
-const ESC = { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' };
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ESC[c]);
-const safeUrl = u => { try { const x = new URL(u); return /^https?:$/.test(x.protocol) ? x.href : ''; } catch { return ''; } };
-const pref = (k, f) => { try { return localStorage.getItem(k) ?? f; } catch { return f; } };
-const setPref = (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} };
+#!/usr/bin/env python3
+"""Movie Board data builder.   python movies.py recent    |    python movies.py history    |    python movies.py index
 
-let tab = pref('movies_tab', 'all'); if (!TABS.some(t => t.k === tab)) tab = 'all';
-let months = parseInt(pref('movies_months', '3'), 10); if (!FRAMES.includes(months)) months = 3;
-let sort = pref('movies_sort', 'rank') === 'date' ? 'date' : 'rank';
-let favOnly = pref('movies_favonly', '0') === '1';
-let streamOnly = pref('movies_streamonly', '0') === '1';
-const isStreaming = m => m.st === 1 || (Array.isArray(m.stream) && m.stream.length > 0);
-let favs = new Set((() => { try { return JSON.parse(pref('movies_favs', '[]')); } catch { return []; } })());
-let index = null, items = [], shown = BATCH, lastKey = '', more = false, lastLen = 0, renderGen = 0;
-const detail = {};   // id -> full movie (poster, summary, trailer...), filled from month files as cards are needed
-const shards = {};
-const expanded = new Set();   // movies whose full description is open
+TMDb (secret TMDB_Key): movie lists, poster, trailer, overview, revenue fallback.
+OMDb (secret OMDB_Key): Rotten Tomatoes %, IMDb rating, domestic box office.
+Movies are stored one JSON file per release month (data/YYYY-MM.json) plus data/index.json.
+"""
+from __future__ import annotations
 
-const cutoffDate = () => months ? new Date(Date.now() - months * 30.44 * 864e5) : null;
-const money = v => {
-  if (v == null) return '—';
-  const k = Math.round(v / 1e3);
-  if (k >= 1e6) return `$${Math.round(v / 1e9)}B`;
-  if (k >= 1e3) { const m = Math.round(v / 1e6); return m >= 1e3 ? `$${Math.round(v / 1e9)}B` : `$${m}M`; }
-  return `$${k}K`;
-};
-const span = m => m >= 24 && m % 12 === 0 ? `${m / 12} year${m === 12 ? '' : 's'}` : `${m} month${m === 1 ? '' : 's'}`;
-const label = m => m === 0 ? 'All' : span(m).replace(/\b\w/g, c => c.toUpperCase());
-function ago(iso) {
-  const t = new Date(iso).getTime(); if (!Number.isFinite(t)) return '—';
-  const min = Math.max(0, Math.round((Date.now() - t) / 60000));
-  return min < 60 ? `${min}m ago` : min < 1440 ? `${Math.floor(min / 60)}h ago` : `${Math.floor(min / 1440)}d ago`;
-}
+import json
+import math
+import os
+import re
+import sys
+import time
+from datetime import date, datetime, timedelta, timezone
+from pathlib import Path
 
-async function getJson(url) {
-  try { const r = await fetch(`${url}?v=${Date.now()}`, { cache: 'no-store' }); return r.ok ? await r.json() : null; } catch { return null; }
-}
-// The page first loads one small file with every movie's scores (data/scores.json), so rankings cover the whole
-// time frame at once. The full card details (poster, summary, trailer...) come from the month files, and only for
-// the cards actually shown, so scrolling pulls in a few files at a time instead of every month up front.
-async function loadData(force) {
-  if (force) { Object.keys(shards).forEach(k => delete shards[k]); Object.keys(detail).forEach(k => delete detail[k]); }
-  const d = await getJson('data/scores.json');
-  if (d && Array.isArray(d.rows)) {
-    index = d;
-    const c = Object.fromEntries(d.cols.map((k, i) => [k, i]));
-    items = d.rows.map(r => ({ id: r[c.id], release: r[c.release], rt: r[c.rt], imdb: r[c.imdb], box: r[c.box], score: r[c.score], st: r[c.st] }));
-  } else {
-    // scores.json has not been built yet (no workflow has run since it was added): fall back to loading every month file.
-    const idx = await getJson('data/index.json');
-    index = idx; items = [];
-    if (idx) {
-      const ms = idx.months.map(x => x.m).filter(ym => !shards[ym]);
-      for (let i = 0; i < ms.length; i += 6) await Promise.all(ms.slice(i, i + 6).map(loadShard));
-      items = Object.values(detail).filter(m => m.release).map(m => ({ id: m.id, release: m.release, rt: m.rt, imdb: m.imdb, box: m.box, score: m.score, st: isStreaming(m) ? 1 : 0 }));
-    }
-  }
-  $('lastUpdated').textContent = index ? `Last updated: ${ago(index.updated)}` : 'Last updated: not yet';
-}
-async function loadShard(ym) {
-  const d = await getJson(`data/${ym}.json`);
-  shards[ym] = true;
-  (d ? d.items : []).forEach(m => { detail[m.id] = m; });
-}
+import requests
 
-// Streaming services: how to match TMDb/JustWatch provider names, the site's favicon domain, and its search URL.
-// Several provider names for one service (Netflix, Netflix Standard with Ads, Max Amazon Channel...) collapse into one link.
-const SERVICES = [
-  { k:'netflix',   re:/netflix/,                         name:'Netflix',        domain:'netflix.com',        url:q => `https://www.netflix.com/search?q=${q}` },
-  { k:'hulu',      re:/^hulu/,                           name:'Hulu',           domain:'hulu.com',           url:() => 'https://www.hulu.com/search' },
-  { k:'disney',    re:/disney/,                          name:'Disney+',        domain:'disneyplus.com',     url:() => 'https://www.disneyplus.com/en-gb/browse/search' },
-  { k:'max',       re:/^max$|hbo/,                       name:'HBO Max',        domain:'hbomax.com', img:'img/hbo-max.png', url:q => `https://play.hbomax.com/search?q=${q}` },
-  { k:'prime',     re:/prime video|^amazon video|^amazon prime/, name:'Prime Video', domain:'primevideo.com', url:q => `https://www.amazon.com/s?k=${q}&i=instant-video` },
-  { k:'apple',     re:/^apple tv/,                       name:'Apple TV',       domain:'tv.apple.com',       url:q => `https://tv.apple.com/search?term=${q}` },
-  { k:'paramount', re:/paramount|showtime/,              name:'Paramount+',     domain:'paramountplus.com',  url:q => `https://www.paramountplus.com/search/?q=${q}` },
-  { k:'peacock',   re:/peacock/,                         name:'Peacock',        domain:'peacocktv.com',      url:() => 'https://www.peacocktv.com/watch/search' },
-  { k:'tubi',      re:/tubi/,                            name:'Tubi',           domain:'tubitv.com',         url:q => `https://tubitv.com/search/${q}` },
-  { k:'pluto',     re:/pluto/,                           name:'Pluto TV',       domain:'pluto.tv',           url:q => `https://pluto.tv/us/search/details?query=${q}` },
-  { k:'roku',      re:/roku/,                            name:'The Roku Channel', domain:'therokuchannel.roku.com', url:q => `https://therokuchannel.roku.com/search/${q}` },
-  { k:'youtube',   re:/youtube/,                         name:'YouTube',        domain:'youtube.com',        url:q => `https://www.youtube.com/results?search_query=${q}` },
-  { k:'crunchy',   re:/crunchyroll/,                     name:'Crunchyroll',    domain:'crunchyroll.com',    url:q => `https://www.crunchyroll.com/search?q=${q}` },
-  { k:'criterion', re:/criterion/,                       name:'Criterion Channel', domain:'criterionchannel.com', url:q => `https://www.criterionchannel.com/search?q=${q}` },
-  { k:'amc',       re:/^amc/,                            name:'AMC+',           domain:'amcplus.com', img:'img/amc-plus.png', url:q => `https://www.amcplus.com/search?q=${q}` },
-];
+TMDB_KEY = os.environ.get("TMDB_Key", "").strip()      # GitHub secret TMDB_Key
+OMDB_KEY = os.environ.get("OMDB_Key", "").strip()      # GitHub secret OMDB_Key
+DATA, STATE = Path("data"), Path("state")
+SKIP_FILE = STATE / "skipped.json"                                # TMDb ids that failed the board rules and are old enough to leave alone
+OMDB_LIMIT = int(os.environ.get("OMDB_DAILY_LIMIT", "1000"))
+OMDB_MARGIN = int(os.environ.get("OMDB_MARGIN", "50"))          # requests never spent
+RECENT_BUDGET = int(os.environ.get("OMDB_RECENT_BUDGET", "300"))  # most the daily job may spend
+RECENT_MONTHS = int(os.environ.get("RECENT_MONTHS", "12"))      # how far back the daily job looks
+RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per page (50 = top 1000 by popularity)
+REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
+NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new that is not ranked yet is re-asked every day
+HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
+MIN_BOX = 1_000_000    # box office below this never counts
+SURE_BOX = 2_000_000   # from MIN_BOX up to this, box office only counts if the movie also has an RT or IMDb score (TMDb revenue is community-edited)
+MIN_VOTES = int(os.environ.get("MIN_VOTES", "0"))               # IMDb votes needed to stay on the board (0 = off); see `python movies.py report`
+KEEP_DAYS = int(os.environ.get("KEEP_DAYS", "60"))              # a movie younger than this is never dropped: ratings and box office may still arrive
+VOTES_GRACE_DAYS = int(os.environ.get("VOTES_GRACE_DAYS", "14"))  # a movie this new is exempt from MIN_VOTES
+HIST_FLOOR = int(os.environ.get("HISTORY_FLOOR_YEAR", "1900"))
+TODAY = datetime.now(timezone.utc).date()
 
-function providerKey(name) {
-  return String(name).toLowerCase()
-    .replace(/\s+(amazon|apple tv|roku premium|youtube primetime)\s+channel$/, '')   // "Max Amazon Channel" -> "max"
-    .replace(/\s+apple tv$/, '')                                                     // "Acorn TV Apple TV" -> "acorn tv"
-    .replace(/\s+(standard |basic |premium )?with ads$/, '')                         // "Netflix Standard with Ads" -> "netflix"
-    .replace(/\s+(premium plus|premium|basic|standard|essential|select)$/, '')       // "Peacock Premium" -> "peacock"
-    .trim();
-}
 
-// One link per service, in TMDb's order. Services we have no search URL for share a single JustWatch link.
-function watchLinks(m) {
-  const t = encodeURIComponent(m.title), seen = new Set(), out = [];
-  let other = false;
-  (m.stream || []).forEach(n => {
-    const key = providerKey(n), sv = SERVICES.find(x => x.re.test(key));
-    if (!sv) { other = true; return; }
-    if (seen.has(sv.k)) return;
-    seen.add(sv.k);
-    out.push({ href: sv.url(t), domain: sv.domain, img: sv.img, name: sv.name });
-  });
-  if (other) out.push({ href: `https://www.justwatch.com/us/search?q=${t}`, domain: 'justwatch.com', name: 'JustWatch' });
-  return [{ href: `https://www.fandango.com/search?q=${t}`, domain: 'fandango.com', name: 'Fandango' }, ...out];   // tickets first, then the streaming services
-}
+def read(path, default):
+    try:
+        return json.loads(Path(path).read_text("utf-8"))
+    except (OSError, ValueError):
+        return default
 
-const fmtDate = d => d ? new Date(d + 'T00:00:00Z').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' }) : '';
 
-function datesHtml(m) {
-  const theaters = fmtDate(m.theatrical || m.release) || '—';
-  const stream = fmtDate(m.digital) || (isStreaming(m) ? 'Available now' : (m.digital === undefined ? '' : 'Not yet'));
-  return `<p class="dates"><b>Theaters:</b> ${esc(theaters)}${stream ? `<br><b>Streaming:</b> ${esc(stream)}` : ''}</p>`;
-}
+def write(path, obj):
+    p = Path(path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(obj, ensure_ascii=False, separators=(",", ":")), "utf-8")
 
-function cardHtml(m, tabDef) {
-  const q = encodeURIComponent(m.title + (m.release ? ' ' + m.release.slice(0, 4) : ''));
-  const rtUrl = `https://www.rottentomatoes.com/search?search=${encodeURIComponent(m.title)}`;
-  const imdbUrl = /^tt\d+$/.test(m.imdb_id || '') ? `https://www.imdb.com/title/${m.imdb_id}/` : `https://www.imdb.com/find/?q=${q}&s=tt`;
-  const ytUrl = safeUrl(m.trailer) || `https://www.youtube.com/results?search_query=${encodeURIComponent(m.title + ' ' + (m.release ? m.release.slice(0, 4) + ' ' : '') + 'trailer')}`;
-  const fav = d => `https://www.google.com/s2/favicons?domain=${d}&sz=64`;
-  const icon = (href, src, name, logo) => `<a href="${esc(href)}" target="_blank" rel="noopener noreferrer" title="${esc(name)}" aria-label="${esc(name)}"><img${logo ? ' class="logo"' : ''} src="${esc(src)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(document.createTextNode('${name[0]}'))"><span class="arrow">↗</span></a>`;
-  const poster = safeUrl(m.poster);
-  const img = poster ? `<img src="${esc(poster)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.outerHTML='<div class=&quot;thumb-fallback&quot;>No Poster</div>'">` : '<div class="thumb-fallback">No Poster</div>';
-  const chip = (l, v, tip) => `<div class="chip" title="${esc(tip)}"><small>${l}</small>${v}</div>`;
-  return `<article class="card">
-    <div class="thumb-wrap">${img}
-      <label class="fav-toggle" title="Favorite"><input type="checkbox" class="fav-input" data-id="${m.id}" ${favs.has(m.id) ? 'checked' : ''}><span class="fav-star">★</span></label>
-      ${isStreaming(m) ? `<div class="stream-pill" title="${esc(watchLinks(m).slice(1).map(w => w.name).join(', '))}">▶ Streaming</div>` : m.rentbuy ? `<div class="stream-pill rent" title="Available to rent or buy${m.digital ? ' since ' + esc(m.digital) : ''}">Rent / Buy</div>` : ''}
-      <div class="rank-pill" title="${esc(tabDef.hint)}">#${m.rank}</div>
-    </div>
-    <div class="body">
-      <p class="title">${esc(m.title)}</p>
-      <p class="desc${m.overview ? '' : ' none'}${expanded.has(m.id) ? '' : ' clamp'}">${m.overview ? esc(m.overview) : 'No summary yet.'}</p>
-      ${m.overview ? `<button class="more" type="button" data-more="${m.id}"${expanded.has(m.id) ? '' : ' hidden'}>${expanded.has(m.id) ? 'See less' : 'See more'}</button>` : ''}
-      <div class="chips">
-        ${chip('RT', m.rt == null ? '—' : Math.round(m.rt) + '%', 'Rotten Tomatoes critic score')}
-        ${chip('IMDb', m.imdb == null ? '—' : m.imdb.toFixed(1), 'IMDb rating')}
-        ${chip('Box', money(m.box), m.bo_src === 'tmdb' ? 'Worldwide revenue from TMDb' : 'Domestic gross from OMDb')}
-      </div>
-      <p class="watch-label">Score Links and Trailer</p>
-      <div class="links scores">
-        ${icon(rtUrl, fav('rottentomatoes.com'), 'Rotten Tomatoes')}
-        ${icon(imdbUrl, fav('imdb.com'), 'IMDb')}
-        ${icon(ytUrl, fav('youtube.com'), 'YouTube')}
-      </div>
-      <p class="watch-label">Get Tickets or Stream On</p>
-      <div class="links watch">${watchLinks(m).map(w => icon(w.href, w.img || fav(w.domain), w.name, !!w.img)).join('')}</div>
-      ${datesHtml(m)}
-    </div>
-  </article>`;
-}
 
-// Scrolling near the bottom reveals the next batch of cards (their month files are fetched in render).
-function loadMore() {
-  if (more && shown < lastLen) { shown += BATCH; render(); }
-}
+def add_months(ym: str, n: int) -> str:
+    y, m = map(int, ym.split("-"))
+    k = y * 12 + m - 1 + n
+    return f"{k // 12:04d}-{k % 12 + 1:02d}"
 
-async function render() {
-  const gen = ++renderGen;
-  const tabDef = TABS.find(t => t.k === tab);
-  const cut = cutoffDate() ? cutoffDate().toISOString().slice(0, 10) : '';
-  // On Rotten Tomatoes and IMDb boards, break equal-score ties by box office.
-  // Movies without box-office data sort after movies that have it.
-  const compareBoxOffice = (a, b) => {
-    const aHasBox = a.box != null && Number.isFinite(Number(a.box));
-    const bHasBox = b.box != null && Number.isFinite(Number(b.box));
-    if (aHasBox !== bHasBox) return aHasBox ? -1 : 1;
-    if (aHasBox && bHasBox && Number(a.box) !== Number(b.box)) return Number(b.box) - Number(a.box);
-    return a.id - b.id;
-  };
-  let list = items.filter(m => m.release >= cut && tabDef.f(m) != null)
-    .sort((a, b) => {
-      const scoreDifference = tabDef.f(b) - tabDef.f(a);
-      if (scoreDifference !== 0) return scoreDifference;
-      if (tab === 'rt' || tab === 'imdb') return compareBoxOffice(a, b);
-      return a.id - b.id;
-    });
-  list.forEach((m, i) => { m.rank = i + 1; });
-  if (favOnly) list = list.filter(m => favs.has(m.id));
-  if (streamOnly) list = list.filter(isStreaming);
-  if (sort === 'date') list.sort((a, b) => b.release.localeCompare(a.release) || a.rank - b.rank);
 
-  $('count').textContent = `${list.length} movie${list.length === 1 ? '' : 's'}${months ? ` released in the last ${span(months)}` : ''} · ranked by ${tabDef.hint.toLowerCase()}`;
-  const grid = $('grid');
-  if (!list.length) {
-    grid.innerHTML = `<div class="empty">${!index ? (location.protocol === 'file:' ? 'Browsers block this page from reading its data files when it is opened straight from disk. Open it through GitHub Pages, or run “python -m http.server” in this folder and visit http://localhost:8000.' : 'No data yet. Run the “Update recent movies” workflow once (Actions tab).') : favOnly ? 'No favorites in this window. Star a movie to pin it here.' : streamOnly ? 'No streaming movies in this window yet. Streaming info is added on each daily update.' : 'No movies match this tab and time frame. Try a longer period or All.'}</div>`;
-    more = false; lastLen = 0; $('sentinel').style.display = 'none'; return;
-  }
-  const key = [tab, months, sort, favOnly, streamOnly].join('|');
-  if (key !== lastKey) { lastKey = key; shown = BATCH; }
-  const slice = list.slice(0, shown);
-  lastLen = list.length;
-  more = list.length > slice.length;
-  const need = [...new Set(slice.filter(m => !detail[m.id]).map(m => m.release.slice(0, 7)))].filter(ym => !shards[ym]);
-  if (need.length) {                                   // fetch the month files these cards live in, 6 at a time
-    $('sentinel').textContent = 'Loading…'; $('sentinel').style.display = '';
-    for (let i = 0; i < need.length; i += 6) await Promise.all(need.slice(i, i + 6).map(loadShard));
-    if (gen !== renderGen) return;                     // a newer render replaced this one while files were loading
-  }
-  grid.innerHTML = slice.filter(m => detail[m.id]).map(m => cardHtml({ ...detail[m.id], rank: m.rank }, tabDef)).join('');
-  fitMore();
-  $('sentinel').textContent = more ? `Showing ${slice.length} of ${list.length} — loading more…` : '';
-  $('sentinel').style.display = more ? '' : 'none';
-}
+def month_bounds(ym: str):
+    last = date.fromisoformat(add_months(ym, 1) + "-01") - timedelta(days=1)
+    return ym + "-01", last.isoformat()
 
-// Show "See more" only on descriptions that are actually cut off.
-function fitMore() {
-  document.querySelectorAll('.desc.clamp').forEach(d => {
-    const b = d.nextElementSibling;
-    if (b && b.classList.contains('more')) b.hidden = d.scrollHeight <= d.clientHeight + 1;
-  });
-}
 
-function renderTabs() {
-  $('sources').innerHTML = TABS.map(t => `<button class="tab-btn${t.k === tab ? ' active' : ''}" data-tab="${t.k}" title="${esc(t.hint)}">${t.l}</button>`).join('');
-  const btn = m => `<button class="tab-btn${m === months ? ' active' : ''}" data-months="${m}">${label(m)}</button>`;
-  $('tabs').innerHTML = MONTHS.map(btn).join('');
-  $('tabsYears').innerHTML = YEARS.map(btn).join('');
-  document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort === sort));
-  $('favBtn').classList.toggle('active', favOnly);
-  $('streamBtn').classList.toggle('active', streamOnly);
-}
+# ---------- HTTP ----------
+def fetch(url, params, headers=None):
+    for i in range(4):
+        try:
+            r = requests.get(url, params=params, headers=headers, timeout=30)
+            if r.status_code == 429 or r.status_code >= 500:
+                time.sleep(2 + 3 * i)
+                continue
+            return r.json()
+        except (requests.RequestException, ValueError):
+            time.sleep(1 + i)
+    return {}
 
-function setup() {
-  $('sources').addEventListener('click', e => {
-    const b = e.target.closest('[data-tab]'); if (!b) return;
-    tab = b.dataset.tab; setPref('movies_tab', tab); window.scrollTo(0, 0); renderTabs(); render();
-  });
-  $('timeframes').addEventListener('click', e => {
-    const b = e.target.closest('[data-months]'); if (!b) return;
-    months = parseInt(b.dataset.months, 10); setPref('movies_months', months); renderTabs(); render();
-  });
-  document.querySelectorAll('.sort-btn[data-sort]').forEach(b => b.addEventListener('click', () => {
-    sort = b.dataset.sort; setPref('movies_sort', sort); renderTabs(); render();
-  }));
-  $('favBtn').addEventListener('click', () => { favOnly = !favOnly; setPref('movies_favonly', favOnly ? 1 : 0); renderTabs(); render(); });
-  $('streamBtn').addEventListener('click', () => { streamOnly = !streamOnly; setPref('movies_streamonly', streamOnly ? 1 : 0); renderTabs(); render(); });
-  $('grid').addEventListener('click', e => {
-    const b = e.target.closest('[data-more]'); if (!b) return;
-    const id = parseInt(b.dataset.more, 10), d = b.previousElementSibling;
-    const open = !expanded.has(id);
-    open ? expanded.add(id) : expanded.delete(id);
-    d.classList.toggle('clamp', !open);
-    b.textContent = open ? 'See less' : 'See more';
-  });
-  window.addEventListener('resize', fitMore);
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(fitMore);
-  $('grid').addEventListener('change', e => {
-    const i = e.target.closest('.fav-input'); if (!i) return;
-    const id = parseInt(i.dataset.id, 10);
-    i.checked ? favs.add(id) : favs.delete(id);
-    setPref('movies_favs', JSON.stringify([...favs]));
-    if (favOnly) render();
-  });
-  $('refreshBtn').addEventListener('click', async () => {
-    const b = $('refreshBtn'); b.disabled = true; b.textContent = 'Refreshing…';
-    await loadData(true); render(); b.disabled = false; b.textContent = 'Refresh';
-  });
-  const sentinel = $('sentinel');
-  if ('IntersectionObserver' in window) {
-    const io = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) loadMore(); }, { rootMargin: '600px 0px' });
-    io.observe(sentinel);
-    new MutationObserver(() => { io.unobserve(sentinel); io.observe(sentinel); }).observe($('grid'), { childList: true });
-  }
-}
 
-(async function init() {
-  setup(); renderTabs();
-  await loadData(); render();
-  setInterval(async () => { await loadData(true); render(); }, 30 * 60 * 1000);
-  setInterval(() => { if (index) $('lastUpdated').textContent = `Last updated: ${ago(index.updated)}`; }, 30000);
-})();
-</script>
-</body>
-</html>
+def tmdb(path, **params):
+    headers = {}
+    if len(TMDB_KEY) > 40:                     # a v4 "read access token" works too
+        headers["Authorization"] = "Bearer " + TMDB_KEY
+    else:
+        params["api_key"] = TMDB_KEY
+    return fetch("https://api.themoviedb.org/3" + path, params, headers)
+
+
+def discover(**params):
+    """Yield TMDb movie ids for a discover query. A failed page raises, so a month is never skipped."""
+    page = 1
+    while True:
+        d = tmdb("/discover/movie", page=page, **params)
+        if "results" not in d:
+            raise RuntimeError(f"TMDb discover failed: {d.get('status_message', 'no answer')}")
+        yield from (m["id"] for m in d["results"])
+        if page >= min(d.get("total_pages", 0), 500):
+            return
+        page += 1
+
+
+class Omdb:
+    def __init__(self, budget: int):
+        self.left, self.used, self.blocked = max(0, budget), 0, False
+
+    def exhausted(self) -> bool:
+        return self.blocked or self.left <= 0
+
+    def get(self, imdb_id: str):
+        if self.exhausted() or not imdb_id or not OMDB_KEY:
+            return None
+        self.left -= 1
+        self.used += 1
+        d = fetch("https://www.omdbapi.com/", {"apikey": OMDB_KEY, "i": imdb_id})
+        if d.get("Response") != "True":
+            if "limit" in str(d.get("Error", "")).lower():
+                self.blocked = True
+            return None
+        return d
+
+
+# ---------- daily OMDb allowance shared by both jobs ----------
+def usage_today() -> int:
+    u = read(STATE / "usage.json", {})
+    return u.get("omdb", 0) if u.get("date") == TODAY.isoformat() else 0
+
+
+def budget_left() -> int:
+    return max(0, OMDB_LIMIT - OMDB_MARGIN - usage_today())
+
+
+# ---------- scoring ----------
+def num(s):
+    try:
+        return float(re.sub(r"[^\d.]", "", str(s or "")))
+    except ValueError:
+        return None
+
+
+def box_score(v):
+    """Box office on a 0-100 log scale: $100K = 0, $1B = 100."""
+    return None if not v or v <= 0 else max(0.0, min(100.0, (math.log10(v) - 5) / 4 * 100))
+
+
+def has_box(m: dict) -> bool:
+    box = m.get("box") or 0
+    return box >= SURE_BOX or (box >= MIN_BOX and (m.get("rt") is not None or m.get("imdb") is not None))
+
+
+def ranked(m: dict) -> bool:
+    """On the board: a counted box office ($2M or more, or $1M or more with an RT or IMDb score), or both RT and IMDb."""
+    return has_box(m) or (m.get("rt") is not None and m.get("imdb") is not None)
+
+
+def build(d: dict, old: dict | None, o: dict | None) -> dict:
+    it = dict(old or {})
+    vids = [v for v in (d.get("videos") or {}).get("results", [])
+            if v.get("site") == "YouTube" and v.get("type") == "Trailer" and v.get("key")]
+    vids.sort(key=lambda v: v.get("published_at") or "", reverse=True)
+    vids.sort(key=lambda v: not v.get("official"))
+    pp = d.get("poster_path")
+    it.update(
+        id=d["id"], title=d.get("title") or "", release=d.get("release_date") or "",
+        overview=d.get("overview") or "", imdb_id=d.get("imdb_id") or "",
+        poster=("https://image.tmdb.org/t/p/w342" + pp) if pp else it.get("poster", ""),
+        trailer=("https://www.youtube.com/watch?v=" + vids[0]["key"]) if vids else "",
+        tmdb_revenue=d.get("revenue") or 0, tmdb_votes=d.get("vote_count") or 0)
+    if "watch/providers" in d:      # US streaming (JustWatch data via TMDb); keep old values if TMDb didn't answer
+        prov = ((d.get("watch/providers") or {}).get("results") or {}).get("US") or {}
+        names = lambda k: [x["provider_name"] for x in prov.get(k, []) if x.get("provider_name")]
+        flat = names("flatrate")
+        it["stream"] = flat + [n for n in names("ads") if n not in flat]      # subscription + free-with-ads
+        raw_rentbuy = bool(prov.get("rent") or prov.get("buy"))
+        us = next((x for x in (d.get("release_dates") or {}).get("results", []) if x.get("iso_3166_1") == "US"), {})
+        dates = lambda t: sorted(r["release_date"][:10] for r in us.get("release_dates", []) if r.get("type") in t and r.get("release_date"))
+        digital, theatrical = dates((4,)), dates((2, 3))      # 4 = digital, 3 = theatrical, 2 = limited theatrical
+        it["digital"] = digital[0] if digital else ""
+        it["theatrical"] = theatrical[0] if theatrical else ""
+        # TMDb lists pre-orders and theater-era listings as rent/buy, so only trust it once the digital release has
+        # happened (or, with no digital date, once the theatrical run is clearly over / there was never one).
+        today = TODAY.isoformat()
+        if it["digital"]:
+            it["rentbuy"] = raw_rentbuy and it["digital"] <= today
+        else:
+            it["rentbuy"] = raw_rentbuy and (not it["theatrical"] or it["theatrical"] <= (TODAY - timedelta(days=45)).isoformat())
+    if o:
+        rt = next((num(r.get("Value")) for r in o.get("Ratings", []) if r.get("Source") == "Rotten Tomatoes"), None)
+        it.update(rt=rt, imdb=num(o.get("imdbRating")), omdb_box=num(o.get("BoxOffice")), votes=num(o.get("imdbVotes")), omdb_at=TODAY.isoformat())
+        if not it["poster"] and o.get("Poster", "N/A") != "N/A":
+            it["poster"] = o["Poster"]
+    for k in ("rt", "imdb", "omdb_box", "votes", "omdb_at"):
+        it.setdefault(k, None)
+    return rescore(it)
+
+
+def verified(it: dict) -> bool:
+    """In both APIs: TMDb has it (we are holding it) and OMDb recognised its IMDb id (omdb_at is only set when OMDb
+    answered). TMDb is community-edited, so a fake entry can carry invented revenue; it has no IMDb page, so OMDb never
+    answers and it never counts. A real movie OMDb knows but has no ratings for yet is still verified."""
+    return bool(it.get("imdb_id")) and bool(it.get("omdb_at"))
+
+
+def rescore(it: dict) -> dict:
+    ok = verified(it)
+    box = (it.get("omdb_box") or it.get("tmdb_revenue") or None) if ok else None   # domestic (OMDb) first, worldwide (TMDb) if missing
+    it["box"], it["bo_src"] = box, ("omdb" if ok and it.get("omdb_box") else "tmdb" if box else "")
+    it.pop("aud", None); it.pop("tmdb_user", None)   # audience score was removed; drop it from older saved items
+    parts = [it.get("rt"), it["imdb"] * 10 if it.get("imdb") is not None else None, box_score(box)]
+    parts = [p for p in parts if p is not None]
+    it["score"] = round(sum(parts) / len(parts), 1) if parts else None   # all available scores, weighted evenly
+    it["n"] = len(parts)
+    return it
+
+
+def age_days(it: dict) -> int:
+    rel = it.get("release") or ""
+    return (TODAY - date.fromisoformat(rel)).days if len(rel) == 10 else 0
+
+
+def asked_no(it: dict) -> bool:
+    """OMDb was really asked about this movie and gave no answer (not merely out of requests that day).
+    History-job movies are only saved after OMDb was asked, so hp counts too."""
+    return bool(it.get("omdb_no")) or it.get("hp") is not None
+
+
+def droppable(it: dict) -> bool:
+    """True if the movie fails the board rules AND is old enough that it will not change. Younger movies are kept."""
+    if age_days(it) < KEEP_DAYS:
+        return False
+    if not it.get("imdb_id"):                      # TMDb-only: no IMDb page at all
+        return True
+    if not it.get("omdb_at"):                      # IMDb id, but OMDb never recognised it
+        return asked_no(it)
+    if not ranked(it):                             # in both, but too little box office and missing RT or IMDb
+        return True
+    return bool(MIN_VOTES) and it.get("votes") is not None and it["votes"] < MIN_VOTES and age_days(it) >= VOTES_GRACE_DAYS
+
+
+
+
+# ---------- storage: one file per release month ----------
+SCORE_COLS = ["id", "release", "rt", "imdb", "box", "score", "st"]
+
+
+def score_row(m: dict) -> list:
+    """One compact row per movie for data/scores.json (st = 1 if on a US subscription/free-with-ads service)."""
+    return [m["id"], m["release"], m.get("rt"), m.get("imdb"), m.get("box"), m.get("score"), 1 if m.get("stream") else 0]
+
+
+class Store:
+    def __init__(self):
+        self.s, self.dirty, self.rows = {}, set(), {}
+        self.skip = set(read(SKIP_FILE, []))
+
+    def month(self, ym):
+        if ym not in self.s:
+            self.s[ym] = {str(m["id"]): m for m in read(DATA / f"{ym}.json", {}).get("items", [])}
+        return self.s[ym]
+
+    def put(self, it):
+        if droppable(it):                          # not worth keeping: remember the id so it is not fetched again
+            self.skip.add(it["id"])
+            self.month(it["release"][:7]).pop(str(it["id"]), None)
+        else:
+            self.month(it["release"][:7])[str(it["id"])] = it
+        self.dirty.add(it["release"][:7])
+
+    def _rows(self, ym):
+        items = self.s[ym].values() if ym in self.s else read(DATA / f"{ym}.json", {}).get("items", [])
+        return [score_row(m) for m in items if m.get("release")]
+
+    def save(self):
+        """Write changed month files, then rebuild data/index.json and data/scores.json (every movie's scores, for the page's ranking)."""
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        for ym in self.dirty:
+            items = sorted(self.s[ym].values(), key=lambda m: -(m.get("score") or -1))
+            write(DATA / f"{ym}.json", {"month": ym, "updated": stamp, "items": items})
+            self.rows[ym] = self._rows(ym)
+        self.dirty.clear()
+        write(SKIP_FILE, sorted(self.skip))
+        for p in DATA.glob("????-??.json"):
+            if p.stem not in self.rows:
+                self.rows[p.stem] = self._rows(p.stem)
+        months = sorted(((ym, len(r)) for ym, r in self.rows.items() if r), reverse=True)
+        write(DATA / "index.json", {"updated": stamp, "months": [{"m": m, "n": n} for m, n in months]})
+        write(DATA / "scores.json", {"updated": stamp, "cols": SCORE_COLS,
+                                     "rows": [r for ym, _ in months for r in self.rows[ym]]})
+
+
+def checkpoint(store: Store, o: Omdb):
+    store.save()
+    write(STATE / "usage.json", {"date": TODAY.isoformat(), "omdb": usage_today() + o.used})
+    o.used = 0
+
+
+def stale(old) -> bool:
+    if not old or not old.get("omdb_at"):
+        return True
+    asked = date.fromisoformat(old["omdb_at"])
+    if (TODAY - asked).days >= REFRESH_DAYS:
+        return True
+    # a brand-new movie that is not on the board yet: ask again every day (once a day) until it is
+    rel = old.get("release") or ""
+    if asked < TODAY and not ranked(old) and len(rel) == 10:
+        age = (TODAY - date.fromisoformat(rel)).days
+        return 0 <= age <= NEW_DAYS
+    return False
+
+
+def refresh(mid, store: Store, o: Omdb, hp=None):
+    if mid in store.skip:
+        return
+    d = tmdb(f"/movie/{mid}", append_to_response="videos,watch/providers,release_dates", language="en-US")
+    if not d.get("id") or len(d.get("release_date") or "") < 10:
+        return
+    old = store.month(d["release_date"][:7]).get(str(mid))
+    need = stale(old) and bool(d.get("imdb_id")) and not o.exhausted()
+    od = o.get(d.get("imdb_id")) if stale(old) else None
+    it = build(d, old, od)
+    if need and not od and not o.blocked:         # OMDb was asked and had nothing: remember that
+        it["omdb_no"] = TODAY.isoformat()
+    elif od:
+        it.pop("omdb_no", None)
+    if hp is not None:
+        it["hp"] = hp                       # which history pass last checked this movie
+    store.put(it)
+
+
+# ---------- jobs ----------
+def run_recent():
+    start = add_months(TODAY.strftime("%Y-%m"), -RECENT_MONTHS) + "-01"
+    q = {"primary_release_date.lte": TODAY.isoformat(), "with_release_type": "2|3", "sort_by": "popularity.desc"}
+    new_start = (TODAY - timedelta(days=NEW_DAYS)).isoformat()
+    newest = list(discover(**q, **{"primary_release_date.gte": new_start}))      # new theatrical releases go first,
+    rest = list(discover(**q, **{"primary_release_date.gte": start}))[: RECENT_PAGES * 20]   # so they get OMDb first
+    ids = newest + [i for i in rest if i not in set(newest)]
+    store, o = Store(), Omdb(min(RECENT_BUDGET, budget_left()))
+    print(f"{len(ids)} movies since {start}; OMDb budget {o.left}")
+    try:
+        for n, mid in enumerate(ids, 1):
+            refresh(mid, store, o)
+            if n % 100 == 0:
+                checkpoint(store, o)
+    finally:
+        checkpoint(store, o)
+    print("Done.")
+
+
+def run_history():
+    """Walk backwards one release month at a time. When it reaches the floor year it starts a new pass
+    (pass 2, 3, ...) from the edge of the recent window and re-checks every movie, so streaming changes get picked up."""
+    store, o = Store(), Omdb(budget_left())
+    state = read(STATE / "history_state.json", {})
+    pas = state.get("pass", 1)
+    fresh_start = lambda: add_months(TODAY.strftime("%Y-%m"), -(RECENT_MONTHS + 1))
+    cur = state.get("next_month") or fresh_start()
+    print(f"History pass {pas} from {cur}; OMDb budget {o.left}")
+    n, finished_pass = 0, False
+    try:
+        while True:
+            if int(cur[:4]) < HIST_FLOOR:          # reached the oldest year: the pass is done
+                finished_pass = True
+                break
+            a, b = month_bounds(cur)
+            ids = list(discover(**{"primary_release_date.gte": a, "primary_release_date.lte": b,
+                                   "vote_count.gte": HIST_MIN_VOTES, "sort_by": "vote_count.desc"}))
+            have = store.month(cur)
+            # Do a movie if it is new, or if an earlier pass did it (items saved before passes existed count as pass 1).
+            todo = [i for i in ids if i not in store.skip and (str(i) not in have or have[str(i)].get("hp", 1) != pas)]
+            finished = True
+            for mid in todo:
+                if stale(have.get(str(mid))) and o.exhausted():     # only stop when this movie would need OMDb
+                    finished = False
+                    break
+                refresh(mid, store, o, hp=pas)
+                n += 1
+                if n % 100 == 0:
+                    checkpoint(store, o)
+            if not finished:
+                break
+            print(f"{cur} complete ({len(store.month(cur))} movies)")
+            cur = add_months(cur, -1)
+            write(STATE / "history_state.json", {"next_month": cur, "pass": pas})
+    finally:
+        checkpoint(store, o)
+    if finished_pass:
+        pas += 1
+        write(STATE / "history_state.json", {"next_month": fresh_start(), "pass": pas})
+        print(f"Pass {pas - 1} reached {HIST_FLOOR}. Pass {pas} will start again from the recent window tomorrow.")
+    else:
+        print(f"Stopped at {cur}; OMDb allowance used for today.")
+
+
+def run_clean():
+    """Re-apply the board rules to every saved movie, drop the ones that fail (and are old enough), and remove duplicate
+    copies of one TMDb id (left behind when TMDb moves a release date into another month). No API calls, no keys."""
+    store = Store()
+    first, dropped, dupes, rescored = {}, 0, 0, 0
+    for p in sorted(DATA.glob("????-??.json")):
+        for it in list(store.month(p.stem).values()):
+            prev = first.get(it["id"])
+            if prev:                                   # keep the copy OMDb was asked about most recently
+                a, b = prev, (p.stem, it)
+                lose, win = (b, a) if (a[1].get("omdb_at") or "") >= (b[1].get("omdb_at") or "") else (a, b)
+                store.s[lose[0]].pop(str(lose[1]["id"]), None); store.dirty.add(lose[0])
+                first[it["id"]] = win
+                dupes += 1
+            else:
+                first[it["id"]] = (p.stem, it)
+    for ym in list(store.s):
+        for k, it in list(store.s[ym].items()):
+            before = (it.get("box"), it.get("score"))
+            rescore(it)
+            if droppable(it):
+                store.skip.add(it["id"]); del store.s[ym][k]; dropped += 1; store.dirty.add(ym)
+            elif before != (it.get("box"), it.get("score")):
+                rescored += 1; store.dirty.add(ym)
+    store.save()
+    print(f"Dropped {dropped} movies, removed {dupes} duplicate copies, re-scored {rescored}. Skip list: {len(store.skip)} ids.")
+
+
+def run_report():
+    """Past 2 months on the board, with their IMDb vote counts, to help pick MIN_VOTES. No API calls."""
+    start = (TODAY - timedelta(days=61)).isoformat()
+    rows = []
+    for p in sorted(DATA.glob("????-??.json"))[-4:]:
+        for it in read(p, {}).get("items", []):
+            if it.get("release", "") >= start and verified(it) and ranked(it):
+                rows.append(it)
+    have = sorted((it for it in rows if it.get("votes") is not None), key=lambda it: it["votes"])
+    print(f"{len(rows)} movies on the board since {start}; {len(have)} have an IMDb vote count so far.")
+    for it in have[:25]:
+        print(f"{int(it['votes']):>8,}  {it['release']}  {it['title'][:50]}")
+
+
+def run_index():
+    """Rebuild data/index.json and data/scores.json from the month files. No API calls, no keys needed."""
+    Store().save()
+    print("Rebuilt data/index.json and data/scores.json.")
+
+
+if __name__ == "__main__":
+    if sys.argv[1:] == ["index"]:
+        run_index(); sys.exit(0)
+    if sys.argv[1:] == ["clean"]:
+        run_clean(); sys.exit(0)
+    if sys.argv[1:] == ["report"]:
+        run_report(); sys.exit(0)
+    if not TMDB_KEY:
+        sys.exit("TMDB_Key is not set.")
+    if not OMDB_KEY:
+        print("Warning: OMDB_Key is not set, so there will be no Rotten Tomatoes, IMDb or domestic box office data.")
+    job = {"recent": run_recent, "history": run_history}.get(sys.argv[1] if len(sys.argv) > 1 else "")
+    job() if job else sys.exit("usage: python movies.py recent | history | index")
