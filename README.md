@@ -61,7 +61,7 @@ Movies that fail the board rules and are older than `KEEP_DAYS` (60) are removed
 
 ## How the data is built
 
-**Recent (daily, 06:17 UTC).** TMDb discover lists theatrical movies released from the first day of the month `RECENT_MONTHS` (12) months ago until today, most popular first (up to `RECENT_PAGES` x 20, so the top 1000). For each movie it calls TMDb for details (includes trailers, US streaming providers and digital release date) and asks OMDb only if the movie has no OMDb data yet or the data is `REFRESH_DAYS` (7) old. This job spends at most `OMDB_RECENT_BUDGET` (300) OMDb requests. The first few days fill the year in popularity order; after that it needs roughly 150 a day to keep every movie within `REFRESH_DAYS`.
+**Recent (daily, 06:17 UTC).** TMDb discover lists theatrical movies released from the first day of the month `RECENT_MONTHS` (12) months ago until today, most popular first (up to `RECENT_PAGES` x 20, so the top 1000). For each movie it calls TMDb for details (includes trailers, US streaming providers and digital release date) and asks OMDb only if the movie has no OMDb data yet or the data is `REFRESH_DAYS` (7) old. New releases (within `NEW_MOVIE_DAYS`, 14) are checked first and asked about more often: every `NEW_MOVIE_RETRY_DAYS` (3) days until they have scores or OMDb has an answer, and every day while the board counts a movie only through box office and it still has no IMDb score. This job spends at most `OMDB_RECENT_BUDGET` OMDb requests (450 in `movies-daily.yml`; 300 if unset). Once caught up it needs roughly 300 a day, about half for the weekly refresh and half for new releases. The log ends with how many requests it spent and how many movies are still waiting for one; if that number stays above zero for days, raise the budget.
 
 **History (daily, 09:17 UTC).** Uses whatever is left of the OMDb allowance: `OMDB_DAILY_LIMIT` (1000) minus `OMDB_MARGIN` (50) minus what the recent job spent. It works backwards one release month at a time, starting just before the recent window, taking movies with at least `HISTORY_MIN_VOTES` (50) TMDb votes, most-voted first. When the allowance runs out it saves and stops; the next day it resumes in the same month, then moves on. It reaches `HISTORY_FLOOR_YEAR` (1900), then **starts over**: the pass number in `state/history_state.json` goes up by one, it returns to the edge of the recent window and re-checks every movie (new streaming services, scores, trailers). Each movie records the pass that last checked it in `hp`. A new pass only spends OMDb requests on movies whose OMDb data is older than `REFRESH_DAYS`; TMDb streaming data is refreshed for every movie. The pass ends for the day when it reaches the floor, and the next pass begins the following day.
 
@@ -100,10 +100,12 @@ Run locally: `pip install -r requirements.txt`, set `TMDB_Key` and `OMDB_Key`, r
 |---|---|---|
 | `OMDB_DAILY_LIMIT` | 1000 | Your OMDb daily allowance |
 | `OMDB_MARGIN` | 50 | Requests never spent (the day boundary is not exact) |
-| `OMDB_RECENT_BUDGET` | 300 | Most the recent job may spend |
+| `OMDB_RECENT_BUDGET` | 300 | Most the recent job may spend (`movies-daily.yml` sets 450) |
 | `RECENT_MONTHS` | 12 | How many months back the recent job looks |
 | `RECENT_PAGES` | 50 | TMDb pages (20 movies each) for the recent job |
 | `REFRESH_DAYS` | 7 | Days before a movie's OMDb data is refreshed |
+| `NEW_MOVIE_DAYS` | 14 | A movie released within this many days counts as brand new |
+| `NEW_MOVIE_RETRY_DAYS` | 3 | Days between OMDb re-asks for a brand-new movie that is not on the board yet or that OMDb could not answer |
 | `HISTORY_MIN_VOTES` | 50 | Minimum TMDb votes for a historical movie |
 | `HISTORY_FLOOR_YEAR` | 1900 | Oldest year the history job goes back to |
 

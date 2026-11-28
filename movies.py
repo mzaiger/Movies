@@ -28,7 +28,8 @@ RECENT_BUDGET = int(os.environ.get("OMDB_RECENT_BUDGET", "300"))  # most the dai
 RECENT_MONTHS = int(os.environ.get("RECENT_MONTHS", "12"))      # how far back the daily job looks
 RECENT_PAGES = int(os.environ.get("RECENT_PAGES", "50"))        # 20 movies per page (50 = top 1000 by popularity)
 REFRESH_DAYS = int(os.environ.get("REFRESH_DAYS", "7"))         # re-ask OMDb for a movie after this
-NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new that is not ranked yet is re-asked every day
+NEW_DAYS = int(os.environ.get("NEW_MOVIE_DAYS", "14"))         # a movie this new is re-asked sooner than REFRESH_DAYS until it has its scores (see stale)
+RETRY_DAYS = int(os.environ.get("NEW_MOVIE_RETRY_DAYS", "3"))   # days between re-asks of a new movie that is not on the board yet, or that OMDb could not answer
 HIST_MIN_VOTES = int(os.environ.get("HISTORY_MIN_VOTES", "50"))
 MIN_BOX = 1_000_000    # box office below this never counts
 SURE_BOX = 2_000_000   # from MIN_BOX up to this, box office only counts if the movie also has an RT or IMDb score (TMDb revenue is community-edited)
@@ -102,6 +103,7 @@ def discover(**params):
 class Omdb:
     def __init__(self, budget: int):
         self.left, self.used, self.blocked = max(0, budget), 0, False
+        self.waiting = 0       # movies that needed an OMDb answer after today's requests ran out
 
     def exhausted(self) -> bool:
         return self.blocked or self.left <= 0
@@ -293,17 +295,30 @@ def checkpoint(store: Store, o: Omdb):
     o.used = 0
 
 
+def days_since(s):
+    """Whole days from an ISO date string to today; None if it is missing or not a date."""
+    try:
+        return (TODAY - date.fromisoformat(str(s)[:10])).days
+    except ValueError:
+        return None
+
+
 def stale(old) -> bool:
-    if not old or not old.get("omdb_at"):
+    """True if OMDb should be asked about this movie today."""
+    if not old:
         return True
-    asked = date.fromisoformat(old["omdb_at"])
-    if (TODAY - asked).days >= REFRESH_DAYS:
+    if not old.get("omdb_at"):
+        # never asked, or asked and OMDb had no answer: retry an unanswered one every RETRY_DAYS, not every day
+        since = days_since(old.get("omdb_no"))
+        return since is None or since >= RETRY_DAYS
+    waited = days_since(old["omdb_at"])
+    if waited is None or waited >= REFRESH_DAYS:
         return True
-    # a brand-new movie that is not on the board yet: ask again every day (once a day) until it is
-    rel = old.get("release") or ""
-    if asked < TODAY and not ranked(old) and len(rel) == 10:
-        age = (TODAY - date.fromisoformat(rel)).days
-        return 0 <= age <= NEW_DAYS
+    age = days_since(old.get("release"))
+    if waited >= 1 and age is not None and 0 <= age <= NEW_DAYS:       # a brand-new movie that was not asked yet today
+        if not ranked(old):
+            return waited >= RETRY_DAYS                                # not on the board yet: ask every RETRY_DAYS until it is
+        return old.get("imdb") is None                                 # on the board only through box office, no IMDb score yet: ask every day
     return False
 
 
@@ -314,7 +329,10 @@ def refresh(mid, store: Store, o: Omdb, hp=None):
     if not d.get("id") or len(d.get("release_date") or "") < 10:
         return
     old = store.month(d["release_date"][:7]).get(str(mid))
-    need = stale(old) and bool(d.get("imdb_id")) and not o.exhausted()
+    due = stale(old) and bool(d.get("imdb_id"))
+    need = due and not o.exhausted()
+    if due and not need:
+        o.waiting += 1                             # wanted an OMDb answer, but today's requests are used up
     od = o.get(d.get("imdb_id")) if stale(old) else None
     it = build(d, old, od)
     if need and not od and not o.blocked:         # OMDb was asked and had nothing: remember that
@@ -335,7 +353,8 @@ def run_recent():
     rest = list(discover(**q, **{"primary_release_date.gte": start}))[: RECENT_PAGES * 20]   # so they get OMDb first
     ids = newest + [i for i in rest if i not in set(newest)]
     store, o = Store(), Omdb(min(RECENT_BUDGET, budget_left()))
-    print(f"{len(ids)} movies since {start}; OMDb budget {o.left}")
+    budget = o.left
+    print(f"{len(ids)} movies since {start}; OMDb budget {budget}")
     try:
         for n, mid in enumerate(ids, 1):
             refresh(mid, store, o)
@@ -343,7 +362,7 @@ def run_recent():
                 checkpoint(store, o)
     finally:
         checkpoint(store, o)
-    print("Done.")
+    print(f"Done. Spent {budget - o.left} of {budget} OMDb requests; {o.waiting} movies still waiting for one.")
 
 
 def run_history():
