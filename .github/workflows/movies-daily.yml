@@ -31,6 +31,7 @@ jobs:
         env:
           TMDB_Key: ${{ secrets.TMDB_Key }}
           OMDB_Key: ${{ secrets.OMDB_Key }}
+          OMDB_RECENT_BUDGET: "450"   # most OMDb requests this job may spend; the history job gets what is left of the day's 950
         run: python movies.py recent
 
       - name: Commit data
